@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bici Game Online</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+
+<body>
+  <div id="menu">
+    <h1>Bici Game</h1>
+    <button onclick="createRoom()">Crear sala</button>
+    <button onclick="joinRoomPrompt()">Unirse a sala</button>
+  </div>
+
+  <div id="lobby" class="hidden">
+    <h2>Código de sala</h2>
+    <h1 id="roomCode"></h1>
+    <p id="status">Esperando jugador 2…</p>
+    <button onclick="cancelRoom()">Cancelar</button>
+  </div>
+
+  <div id="game" class="hidden">
+    <h2>Carrera en curso</h2>
+    <p>Velocidad: <span id="speed">0</span></p>
+    <p>Distancia: <span id="distance">0</span></p>
+    <p>Rival: <span id="enemyDistance">0</span></p>
+  </div>
+
+  <script src="game.js"></script>
+  <script src="online.js"></script>
+</body>
+</html>
