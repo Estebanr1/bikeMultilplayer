@@ -9,29 +9,45 @@ const db = firebase.database();
 // ===== Online state =====
 let roomId = null;
 let playerId = "p" + Math.floor(Math.random() * 100000);
-let enemyState = {
-  speed: 0,
-  distance: 0
-};
+let enemyState = { speed: 0, distance: 0 };
 
-// ===== UI =====
-function createRoom() {
+// ===== MATCHMAKING AUTOMÁTICO =====
+async function startOnlineGame() {
+  const roomsSnap = await db.ref("rooms").once("value");
+
+  if (roomsSnap.exists()) {
+    const rooms = roomsSnap.val();
+
+    for (let id in rooms) {
+      const players = rooms[id].players || {};
+
+      if (Object.keys(players).length === 1) {
+        // 👉 UNIRSE COMO JUGADOR 2
+        roomId = id;
+
+        db.ref(`rooms/${roomId}/players/${playerId}`).set({
+          speed: 0,
+          distance: 0
+        });
+
+        console.log("Unido a sala:", roomId);
+        listenRoom();
+        return;
+      }
+    }
+  }
+
+  // 👉 CREAR SALA (JUGADOR 1)
   roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
 
-  db.ref("rooms/" + roomId).set({ created: Date.now() });
-  db.ref(`rooms/${roomId}/players/${playerId}`).set({ speed: 0, distance: 0 });
+  await db.ref(`rooms/${roomId}`).set({
+    created: Date.now(),
+    players: {
+      [playerId]: { speed: 0, distance: 0 }
+    }
+  });
 
-  alert("Sala creada: " + roomId);
-  listenRoom();
-}
-
-function joinRoomPrompt() {
-  const code = prompt("Código de sala:");
-  if (!code) return;
-
-  roomId = code.toUpperCase();
-  db.ref(`rooms/${roomId}/players/${playerId}`).set({ speed: 0, distance: 0 });
-
+  console.log("Sala creada:", roomId);
   listenRoom();
 }
 
@@ -68,3 +84,7 @@ function getEnemyDistance() {
 function getEnemySpeed() {
   return enemyState.speed || 0;
 }
+
+// ===== EXPONER FUNCIÓN GLOBAL =====
+window.startOnlineGame = startOnlineGame;
+
