@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚴‍♂️ Bike Race Game V16 COMPLETE</title>
+    <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getDatabase } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+  const firebaseConfig = {
+    databaseURL: "https://bicigame-a06d7-default-rtdb.firebaseio.com"
+  };
+
+  window.app = initializeApp(firebaseConfig);
+  window.db = getDatabase(app);
+</script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- PeerJS para conexión P2P -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @keyframes pedal {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+        }
+        
+        @keyframes road-scroll {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 60px; }
+        }
+
+        @keyframes bike-bounce {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        
+        .pedaling {
+            animation: pedal 0.5s linear infinite;
+        }
+        
+        .bike-racing {
+            animation: bike-bounce 0.3s ease-in-out infinite;
+        }
+
+        .race-track {
+            background: linear-gradient(to bottom, 
+                #4ade80 0%, 
+                #22c55e 50%, 
+                #16a34a 100%
+            );
+        }
+
+        .road-lines {
+            background-image: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 20px,
+                #fbbf24 20px,
+                #fbbf24 40px,
+                transparent 40px,
+                transparent 60px
+            );
+            animation: road-scroll 1s linear infinite;
+        }
+
+        .lane {
+            position: relative;
+            background: linear-gradient(to right, 
+                #6b7280 0%, 
+                #4b5563 50%, 
+                #6b7280 100%
+            );
+            border-left: 4px solid #fbbf24;
+            border-right: 4px solid #fbbf24;
+        }
+
+        .finish-line {
+            background: repeating-linear-gradient(
+                45deg,
+                #000,
+                #000 20px,
+                #fff 20px,
+                #fff 40px
+            );
+        }
+
+        .v16-badge {
+            background: linear-gradient(45deg, #10b981, #3b82f6, #8b5cf6);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+            animation: pulse 2s infinite;
+        }
+
+        .bike-icon {
+            font-size: 3rem;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+        }
+
+        .speed-trail {
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.8), transparent);
+            top: 50%;
+            left: -100%;
+            animation: trail-move 0.3s ease-out;
+        }
+
+        @keyframes trail-move {
+            to { left: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Página de Inicio -->
+        <div id="inicio" class="page active">
+            <div class="max-w-4xl mx-auto text-center">
+                <h1 class="text-5xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-bicycle text-blue-600"></i>
+                    Bike Race Game V16 COMPLETE
+                </h1>
+                
+                <div class="v16-badge">
+                    ✅ V16 COMPLETE - Vista de Arriba + Multijugador Online + Sensor Real
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+                    <h2 class="text-2xl font-semibold mb-4">Conexión del Sensor</h2>
+                    
+                    <div id="estadoConexion" class="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                        <span class="text-blue-800">🚀 V16 - Verificando compatibilidad...</span>
+                    </div>
+                    
+                    <div id="sensorStatus" class="hidden mb-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div id="sensorIndicator" class="p-3 rounded-lg border bg-blue-100 border-blue-300">
+                                <div class="text-center">
+                                    <div class="text-2xl mb-1">🔍</div>
+                                    <div class="text-sm font-medium">Sensor HW-511</div>
+                                    <div class="text-xs" id="sensorStatusText">Esperando...</div>
+                                </div>
+                            </div>
+                            <div class="p-3 rounded-lg border bg-gray-100 border-gray-300">
+                                <div class="text-center">
+                                    <div id="ledDot" class="w-4 h-4 rounded-full mx-auto mb-1 bg-gray-400"></div>
+                                    <div class="text-sm font-medium">LED NodeMCU</div>
+                                    <div class="text-xs" id="ledStatusText">⚫ OFF</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="clickCounter" class="hidden mb-6 p-4 bg-blue-100 rounded-lg">
+                        <div class="text-center">
+                            <div id="totalClicks" class="text-3xl font-bold text-blue-800 mb-1">0</div>
+                            <div class="text-sm text-blue-600">Total Clicks Detectados</div>
+                            <div id="lastClickTime" class="text-xs text-blue-500"></div>
+                        </div>
+                    </div>
+                    
+                    <button id="detectarNodeMCU" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors mb-4">
+                        <i class="fas fa-usb mr-2"></i>
+                        Conectar Sensor por USB
+                    </button>
+
+                    <div id="controlButtons" class="hidden mb-6">
+                        <div class="grid grid-cols-3 gap-2">
+                            <button id="testSensor" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
+                                🧪 Probar
+                            </button>
+                            <button id="requestStatus" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
+                                📊 Estado
+                            </button>
+                            <button id="disconnectNodeMCU" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
+                                🔌 Desconectar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 text-sm text-gray-500">
+                        <p>💡 También puedes jugar con clicks manuales o conectar jugador remoto</p>
+                    </div>
+                </div>
+
+                <!-- Opciones de Conexión -->
+                <div class="bg-white rounded-lg shadow-lg p-8">
+                    <h2 class="text-2xl font-semibold mb-6">Métodos de Conexión</h2>
+                    
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <!-- Conexión Local -->
+                        <div class="border-2 border-blue-300 rounded-lg p-6 hover:border-blue-500 transition-all">
+                            <div class="text-5xl mb-4 text-center">🔌</div>
+                            <h3 class="text-xl font-bold mb-3 text-center">Conexión Local</h3>
+                            <p class="text-gray-600 mb-4 text-center">Sensor físico o clicks manuales</p>
+                            <button id="btnLocal" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg w-full">
+                                Jugar Local
+                            </button>
+                        </div>
+
+                        <!-- Conexión Online -->
+                        <div class="border-2 border-purple-300 rounded-lg p-6 hover:border-purple-500 transition-all">
+                            <div class="text-5xl mb-4 text-center">🌐</div>
+                            <h3 class="text-xl font-bold mb-3 text-center">Multijugador Online</h3>
+                            <p class="text-gray-600 mb-4 text-center">Compite con jugadores remotos</p>
+                            <button id="btnOnline" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg w-full">
+                                Jugar Online
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Selección de Modo -->
+        <div id="seleccionModo" class="page hidden">
+            <div class="max-w-4xl mx-auto text-center">
+                <h1 class="text-3xl font-bold text-gray-800 mb-8">Selecciona el Modo de Juego</h1>
+                
+                <div class="mb-4">
+                    <div class="v16-badge" id="connectionBadge">
+                        Modo Seleccionado
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Individual -->
+                    <div class="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow cursor-pointer" id="cardSingle">
+                        <div class="text-6xl mb-4">
+                            <i class="fas fa-user text-blue-600"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-4">Individual</h3>
+                        <p class="text-gray-600 mb-6">Compite contra el tiempo</p>
+                        <button class="mode-btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg w-full" data-mode="single">
+                            Comenzar
+                        </button>
+                    </div>
+                    
+                    <!-- Multijugador Local -->
+                    <div class="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow cursor-pointer" id="cardMulti">
+                        <div class="text-6xl mb-4">
+                            <i class="fas fa-users text-green-600"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-4">Multijugador Local</h3>
+                        <p class="text-gray-600 mb-6">2 jugadores mismo dispositivo</p>
+                        <button class="mode-btn bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg w-full" data-mode="multi">
+                            Competir
+                        </button>
+                    </div>
+
+                    <!-- Online -->
+                    <div class="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow cursor-pointer" id="cardOnline">
+                        <div class="text-6xl mb-4">
+                            <i class="fas fa-globe text-purple-600"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-4">Online</h3>
+                        <p class="text-gray-600 mb-6">Compite remotamente</p>
+                        <div id="onlineOptions" class="space-y-2">
+                            <button class="mode-btn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg w-full" data-mode="online-host">
+                                Crear Sala
+                            </button>
+                            <button class="mode-btn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg w-full" data-mode="online-join">
+                                Unirse a Sala
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Sala Online -->
+        <div id="salaOnline" class="page hidden">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-lg shadow-lg p-8">
+                    <h2 class="text-3xl font-bold text-center mb-6">
+                        <i class="fas fa-globe text-purple-600"></i>
+                        Sala Multijugador Online
+                    </h2>
+
+                    <!-- Crear Sala -->
+                    <div id="crearSala" class="hidden">
+                        <div class="text-center mb-6">
+                            <h3 class="text-xl font-bold mb-4">Código de Sala</h3>
+                            <div class="bg-purple-100 border-2 border-purple-300 rounded-lg p-6">
+                                <div id="roomCode" class="text-5xl font-mono font-bold text-purple-600 mb-2">----</div>
+                                <p class="text-sm text-gray-600">Comparte este código con tu rival</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <p class="text-sm">
+                                <i class="fas fa-info-circle text-blue-600"></i>
+                                <strong>Esperando jugador 2...</strong>
+                            </p>
+                            <p class="text-xs text-gray-600 mt-2">El otro jugador debe hacer clic en "Unirse a Sala" e ingresar este código</p>
+                        </div>
+
+                        <button id="cancelarSala" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg w-full">
+                            Cancelar
+                        </button>
+                    </div>
+
+                    <!-- Unirse a Sala -->
+                    <div id="unirseASala" class="hidden">
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold mb-2">Código de Sala:</label>
+                            <input 
+                                type="text" 
+                                id="inputRoomCode" 
+                                placeholder="Ingresa el código de 4 dígitos"
+                                maxlength="4"
+                                class="w-full px-4 py-3 text-2xl font-mono text-center border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none"
+                            >
+                        </div>
+
+                        <div class="space-y-2">
+                            <button id="btnUnirse" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg w-full">
+                                <i class="fas fa-sign-in-alt mr-2"></i>
+                                Unirse a la Sala
+                            </button>
+                            <button id="cancelarUnion" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg w-full">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Estado de Conexión -->
+                    <div id="estadoOnline" class="hidden">
+                        <div class="text-center mb-6">
+                            <div class="text-6xl mb-4">
+                                <i class="fas fa-wifi text-green-600 animate-pulse"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-green-600 mb-2">¡Conectado!</h3>
+                            <p class="text-gray-600" id="connectionInfo">Estableciendo conexión P2P...</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-blue-100 border border-blue-300 rounded-lg p-4 text-center">
+                                <div class="text-3xl mb-2">👤</div>
+                                <div class="font-bold">Jugador 1</div>
+                                <div class="text-xs text-gray-600" id="player1Status">Esperando...</div>
+                            </div>
+                            <div class="bg-purple-100 border border-purple-300 rounded-lg p-4 text-center">
+                                <div class="text-3xl mb-2">👤</div>
+                                <div class="font-bold">Jugador 2</div>
+                                <div class="text-xs text-gray-600" id="player2Status">Esperando...</div>
+                            </div>
+                        </div>
+
+                        <div id="readyToStart" class="hidden">
+                            <button id="iniciarCarreraOnline" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg w-full">
+                                <i class="fas fa-flag-checkered mr-2"></i>
+                                Iniciar Carrera
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Juego - VISTA DE ARRIBA -->
+        <div id="juegoCarrera" class="page hidden">
+            <div class="max-w-6xl mx-auto">
+                <!-- HUD Superior -->
+                <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-sm text-gray-600">Tiempo</div>
+                            <div id="tiempoRestante" class="text-3xl font-bold text-red-600">60</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Meta</div>
+                            <div class="text-xl font-bold text-green-600">1000m</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Modo</div>
+                            <div id="modoJuego" class="text-xl font-bold text-purple-600">Individual</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pista de Carreras - VISTA DE ARRIBA -->
+                <div class="bg-white rounded-lg shadow-2xl overflow-hidden" style="height: 600px;">
+                    <div class="relative h-full race-track">
+                        <!-- Líneas de la carretera -->
+                        <div class="absolute inset-0 road-lines pointer-events-none"></div>
+
+                        <!-- Línea de meta -->
+                        <div class="absolute top-0 left-0 right-0 h-8 finish-line flex items-center justify-center">
+                            <span class="text-white font-bold text-xs bg-black/50 px-2 py-1 rounded">META 🏁</span>
+                        </div>
+
+                        <!-- Carril 1 (Izquierda) -->
+                        <div class="absolute left-0 top-0 bottom-0 lane" style="width: 48%;">
+                            <!-- Jugador 1 -->
+                            <div id="player1Container" class="absolute w-full transition-all duration-300" style="bottom: 5%; left: 0;">
+                                <div class="text-center">
+                                    <div id="player1Bike" class="bike-icon">🚴‍♂️</div>
+                                    <div class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold inline-block">
+                                        Jugador 1
+                                    </div>
+                                    <div id="player1Stats" class="text-xs mt-1">
+                                        <span class="bg-white/80 px-2 py-1 rounded">0 km/h</span>
+                                        <span class="bg-white/80 px-2 py-1 rounded ml-1">0m</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Separador central -->
+                        <div class="absolute left-1/2 top-0 bottom-0 w-1 bg-yellow-400 transform -translate-x-1/2"></div>
+
+                        <!-- Carril 2 (Derecha) -->
+                        <div class="absolute right-0 top-0 bottom-0 lane" style="width: 48%;">
+                            <!-- Jugador 2 / Rival -->
+                            <div id="player2Container" class="absolute w-full transition-all duration-300" style="bottom: 5%; left: 0;">
+                                <div class="text-center">
+                                    <div id="player2Bike" class="bike-icon">🚴‍♀️</div>
+                                    <div class="mt-2 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold inline-block">
+                                        Jugador 2
+                                    </div>
+                                    <div id="player2Stats" class="text-xs mt-1">
+                                        <span class="bg-white/80 px-2 py-1 rounded">0 km/h</span>
+                                        <span class="bg-white/80 px-2 py-1 rounded ml-1">0m</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Indicadores de progreso -->
+                        <div class="absolute left-0 right-0 bottom-0 bg-black/50 p-2">
+                            <div class="grid grid-cols-2 gap-2 text-white text-xs">
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span>🔵 Jugador 1</span>
+                                        <span id="player1Progress">0%</span>
+                                    </div>
+                                    <div class="bg-gray-700 rounded-full h-2">
+                                        <div id="player1ProgressBar" class="bg-blue-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span>🔴 Jugador 2</span>
+                                        <span id="player2Progress">0%</span>
+                                    </div>
+                                    <div class="bg-gray-700 rounded-full h-2">
+                                        <div id="player2ProgressBar" class="bg-red-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controles -->
+                <div class="bg-white rounded-lg shadow-lg p-4 mt-4">
+                    <div class="flex justify-center gap-4">
+                        <button id="btnPedalear" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl">
+                            🚴‍♂️ PEDALEAR (Click o Sensor)
+                        </button>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-600">Jugador 2</div>
+                            <div class="text-xs bg-gray-100 px-3 py-2 rounded">Presiona ESPACIO</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Resultados -->
+        <div id="resultados" class="page hidden">
+            <div class="max-w-2xl mx-auto text-center">
+                <h1 class="text-4xl font-bold text-gray-800 mb-8">¡Fin de la Carrera!</h1>
+                
+                <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+                    <div class="text-6xl mb-6">
+                        <i id="resultIcon" class="fas fa-trophy text-yellow-500"></i>
+                    </div>
+                    
+                    <h2 id="resultTitle" class="text-2xl font-semibold mb-6">Resultados</h2>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="text-3xl">🔵</div>
+                                <div class="text-left">
+                                    <div class="font-bold">Jugador 1</div>
+                                    <div class="text-sm text-gray-600" id="player1Method">Sensor</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold text-blue-600" id="distanciaPlayer1">0m</div>
+                                <div class="text-sm text-gray-600" id="velocidadPlayer1">0 km/h</div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <div class="text-3xl">🔴</div>
+                                <div class="text-left">
+                                    <div class="font-bold">Jugador 2</div>
+                                    <div class="text-sm text-gray-600" id="player2Method">Espacio</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold text-red-600" id="distanciaPlayer2">0m</div>
+                                <div class="text-sm text-gray-600" id="velocidadPlayer2">0 km/h</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="winnerMessage" class="text-2xl font-bold mb-6"></div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <button id="volverInicio" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+                            <i class="fas fa-home mr-2"></i>
+                            Inicio
+                        </button>
+                        <button id="revancha" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+                            <i class="fas fa-redo mr-2"></i>
+                            Revancha
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información de Deploy -->
+    <div id="deployInfo" class="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-xs hidden">
+        <button onclick="document.getElementById('deployInfo').classList.add('hidden')" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+        </button>
+        <h4 class="font-bold mb-2 text-sm">🌐 Modo Online Activo</h4>
+        <p class="text-xs text-gray-600 mb-2">Conexión P2P establecida</p>
+        <div class="text-xs bg-green-50 border border-green-200 rounded p-2">
+            <strong>ID:</strong> <span id="myPeerId" class="font-mono text-xs">...</span>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+    <script src="online.js"></script>
+
+</body>
+</html>
