@@ -598,10 +598,12 @@ document.addEventListener("DOMContentLoaded", () => {
     showPage("seleccionModo")
   })
 
-  document.getElementById("btnOnline")?.addEventListener("click", () => {
-    showPage("salaOnline")
-    setupOnlineHost()
-  })
+document.getElementById("btnOnline")?.addEventListener("click", () => {
+  showPage("juegoCarrera")
+  startOnlineGame()   // 🔥 FIREBASE MATCHMAKING
+  startGame("online")
+})
+
 
   document.querySelectorAll(".mode-btn").forEach((btn) => {
     btn.addEventListener("click", function () {
