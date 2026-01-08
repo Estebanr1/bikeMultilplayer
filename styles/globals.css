@@ -89,4 +89,62 @@
   body {
     @apply bg-background text-foreground;
   }
+}/* ===== MULTIPLAYER BIKE GAME ===== */
+
+.page { display: none; }
+.page.active { display: block; }
+
+.btn-primary {
+  background: #22c55e;
+  padding: 12px 20px;
+  border-radius: 10px;
+  color: black;
+  font-weight: bold;
 }
+
+.btn-secondary {
+  background: #64748b;
+  padding: 10px 16px;
+  border-radius: 10px;
+}
+
+.track {
+  margin-top: 20px;
+}
+
+.lane {
+  position: relative;
+  height: 120px;
+  background: #1f2933;
+  margin-bottom: 10px;
+  border-radius: 10px;
+}
+
+.player {
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  transition: bottom 0.2s linear;
+}
+
+.bike {
+  width: 80px;
+}
+
+.bike.red {
+  filter: hue-rotate(140deg);
+}
+
+.progress {
+  background: #334155;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress div {
+  background: #22c55e;
+  height: 100%;
+  width: 0%;
+}
+
