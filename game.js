@@ -354,15 +354,15 @@ document.addEventListener("DOMContentLoaded", () => {
   })
 
   document.getElementById("btnCrearSala")?.addEventListener("click", () => {
-    const codigo = Math.random().toString(36).substring(2, 6).toUpperCase()
-    document.getElementById("codigoSala").textContent = codigo
+    
     document.getElementById("opcionesView")?.classList.add("hidden")
     document.getElementById("crearSalaView")?.classList.remove("hidden")
 
     // Iniciar sala en Firebase si está disponible
-    if (typeof window.createOnlineRoom === "function") {
-      window.createOnlineRoom(codigo)
-    }
+    if (typeof window.createRoom === "function") {
+  window.createRoom()
+}
+
   })
 
   document.getElementById("btnUnirseSala")?.addEventListener("click", () => {
@@ -378,9 +378,10 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("conectadoView")?.classList.remove("hidden")
 
       // Unirse a sala en Firebase si está disponible
-      if (typeof window.joinOnlineRoom === "function") {
-        window.joinOnlineRoom(codigo)
-      }
+      if (typeof window.joinRoom === "function") {
+  window.joinRoom(codigo)
+}
+
     } else {
       alert("Ingresa un código de 4 caracteres")
     }
