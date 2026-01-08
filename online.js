@@ -1,18 +1,25 @@
-// ===== ONLINE.JS - V16 FIREBASE MATCHMAKING =====
+// ===== ONLINE.JS - V16 FIREBASE MATCHMAKING (SALAS CON CODIGO) =====
 console.log("[ONLINE] Cargando modulo online V16...")
 
-// Import Firebase
-const firebase = require("firebase/app")
-require("firebase/database")
-
-// Firebase config
+// Firebase config (usando CDN, ya cargado en index.html)
 const firebaseConfig = {
   databaseURL: "https://bicigame-a06d7-default-rtdb.firebaseio.com",
 }
 
-// Init Firebase
-const firebaseApp = firebase.initializeApp(firebaseConfig)
-const db = firebase.database()
+// Declare firebase variable
+const firebase = window.firebase
+
+// Init Firebase (verificar si ya existe)
+let db
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig)
+  }
+  db = firebase.database()
+  console.log("[ONLINE] Firebase inicializado correctamente")
+} catch (error) {
+  console.error("[ONLINE] Error inicializando Firebase:", error)
+}
 
 // Estado online
 let roomId = null
@@ -34,60 +41,21 @@ function updateOnlineStatus(message, isConnected = false) {
   }
 }
 
-// ===== MATCHMAKING =====
-async function startOnlineGame() {
-  updateOnlineStatus("Buscando sala...")
+// ===== CREAR SALA (HOST) =====
+async function createRoom() {
+  if (!db) {
+    alert("Error: Firebase no esta conectado")
+    return
+  }
 
-  // Mostrar vista de espera
-  document.getElementById("buscarView")?.classList.add("hidden")
-  document.getElementById("esperandoView")?.classList.remove("hidden")
+  updateOnlineStatus("Creando sala...")
+
+  const codigo = Math.random().toString(36).substring(2, 6).toUpperCase()
+  roomId = codigo
+  isHost = true
 
   try {
-    // Paso 1: Buscar salas esperando
-    const roomsSnap = await db.ref("rooms").orderByChild("status").equalTo("waiting").limitToFirst(1).once("value")
-
-    const rooms = roomsSnap.val()
-
-    if (rooms) {
-      // HAY SALA ESPERANDO - UNIRSE COMO GUEST
-      const foundRoomId = Object.keys(rooms)[0]
-      console.log("[ONLINE] Sala encontrada:", foundRoomId)
-
-      // Transaccion atomica para tomar la sala
-      const statusRef = db.ref(`rooms/${foundRoomId}/status`)
-      const result = await statusRef.transaction((currentStatus) => {
-        if (currentStatus === "waiting") {
-          return "playing"
-        }
-        return // Abortar
-      })
-
-      if (result.committed && result.snapshot.val() === "playing") {
-        // Exito - somos guest
-        isHost = false
-        roomId = foundRoomId
-
-        await db.ref(`rooms/${roomId}/players/${playerId}`).set({
-          speed: 0,
-          distance: 0,
-          ready: true,
-        })
-
-        updateOnlineStatus("Conectado! Eres Jugador 2", true)
-        console.log("[ONLINE] GUEST unido a sala:", roomId)
-
-        onlineReady = true
-        showConnectedView()
-        listenRoom()
-        return
-      }
-    }
-
-    // NO HAY SALA - CREAR COMO HOST
-    console.log("[ONLINE] Creando sala como HOST")
-    isHost = true
-    roomId = playerId
-
+    // Crear sala en Firebase
     await db.ref(`rooms/${roomId}`).set({
       created: Date.now(),
       host: playerId,
@@ -98,21 +66,109 @@ async function startOnlineGame() {
       gameStarted: false,
     })
 
-    document.getElementById("salaId").textContent = roomId.slice(-6)
-    updateOnlineStatus("Esperando rival...")
+    // Mostrar codigo al usuario
+    document.getElementById("crearSalaView")?.classList.add("hidden")
+    document.getElementById("unirseSalaView")?.classList.add("hidden")
+    document.getElementById("esperandoView")?.classList.remove("hidden")
+    document.getElementById("salaId").textContent = roomId
+
+    updateOnlineStatus("Sala creada. Esperando rival...")
     console.log("[ONLINE] HOST - Sala creada:", roomId)
 
-    // Escuchar jugador 2
+    // Escuchar cuando se una jugador 2
     listenForPlayer2()
   } catch (error) {
-    console.error("[ONLINE] Error:", error)
-    updateOnlineStatus("Error. Reintentando...")
-    setTimeout(startOnlineGame, 2000)
+    console.error("[ONLINE] Error creando sala:", error)
+    updateOnlineStatus("Error creando sala")
+    alert("Error creando sala. Intenta de nuevo.")
+  }
+}
+
+// ===== UNIRSE A SALA (GUEST) =====
+async function joinRoom(codigo) {
+  if (!db) {
+    alert("Error: Firebase no esta conectado")
+    return
+  }
+
+  if (!codigo || codigo.length < 4) {
+    alert("Ingresa un codigo de sala valido (4 caracteres)")
+    return
+  }
+
+  codigo = codigo.toUpperCase().trim()
+  updateOnlineStatus("Verificando sala...")
+
+  try {
+    const roomSnap = await db.ref(`rooms/${codigo}`).once("value")
+
+    if (!roomSnap.exists()) {
+      console.log("[ONLINE] Sala no existe:", codigo)
+      updateOnlineStatus("Sala no encontrada")
+      alert("La sala '" + codigo + "' no existe. Verifica el codigo.")
+      return
+    }
+
+    const roomData = roomSnap.val()
+    console.log("[ONLINE] Sala encontrada:", roomData)
+
+    if (roomData.status !== "waiting") {
+      updateOnlineStatus("Sala no disponible")
+      alert("Esta sala ya tiene una partida en curso o finalizo.")
+      return
+    }
+
+    const playerCount = roomData.players ? Object.keys(roomData.players).length : 0
+    if (playerCount >= 2) {
+      updateOnlineStatus("Sala llena")
+      alert("Esta sala ya tiene 2 jugadores.")
+      return
+    }
+
+    // Todo OK - unirse como GUEST
+    roomId = codigo
+    isHost = false
+
+    const statusRef = db.ref(`rooms/${roomId}/status`)
+    const result = await statusRef.transaction((currentStatus) => {
+      if (currentStatus === "waiting") {
+        return "playing"
+      }
+      return // Abortar si ya no esta waiting
+    })
+
+    if (!result.committed || result.snapshot.val() !== "playing") {
+      updateOnlineStatus("No se pudo unir")
+      alert("Otro jugador se unio primero. Intenta otra sala.")
+      roomId = null
+      return
+    }
+
+    // Agregar jugador a la sala
+    await db.ref(`rooms/${roomId}/players/${playerId}`).set({
+      speed: 0,
+      distance: 0,
+      ready: true,
+    })
+
+    console.log("[ONLINE] GUEST unido a sala:", roomId)
+    updateOnlineStatus("Conectado! Eres Jugador 2", true)
+    onlineReady = true
+
+    showConnectedView()
+    listenRoom()
+  } catch (error) {
+    console.error("[ONLINE] Error uniendose:", error)
+    updateOnlineStatus("Error de conexion")
+    alert("Error al unirse a la sala. Intenta de nuevo.")
+    roomId = null
   }
 }
 
 // ===== HOST: Escuchar jugador 2 =====
 function listenForPlayer2() {
+  if (!roomId) return
+
   const playersRef = db.ref(`rooms/${roomId}/players`)
 
   playersRef.on("child_added", (snap) => {
@@ -127,21 +183,22 @@ function listenForPlayer2() {
     }
   })
 
-  // Timeout 60s
+  // Timeout 120s (2 minutos)
   setTimeout(() => {
     if (!onlineReady && isHost) {
-      console.log("[ONLINE] Timeout")
+      console.log("[ONLINE] Timeout - nadie se unio")
       updateOnlineStatus("Nadie se unio. Intenta de nuevo.")
       db.ref(`rooms/${roomId}`).remove()
       roomId = null
       resetOnlineUI()
     }
-  }, 60000)
+  }, 120000)
 }
 
 // ===== Mostrar vista conectado =====
 function showConnectedView() {
-  document.getElementById("buscarView")?.classList.add("hidden")
+  document.getElementById("crearSalaView")?.classList.add("hidden")
+  document.getElementById("unirseSalaView")?.classList.add("hidden")
   document.getElementById("esperandoView")?.classList.add("hidden")
   document.getElementById("conectadoView")?.classList.remove("hidden")
 
@@ -152,7 +209,8 @@ function showConnectedView() {
 
 // ===== Reset UI =====
 function resetOnlineUI() {
-  document.getElementById("buscarView")?.classList.remove("hidden")
+  document.getElementById("crearSalaView")?.classList.remove("hidden")
+  document.getElementById("unirseSalaView")?.classList.remove("hidden")
   document.getElementById("esperandoView")?.classList.add("hidden")
   document.getElementById("conectadoView")?.classList.add("hidden")
 }
@@ -227,7 +285,7 @@ function getRoomId() {
 
 // ===== Cleanup =====
 function cleanupOnlineGame() {
-  if (roomId) {
+  if (roomId && db) {
     db.ref(`rooms/${roomId}/players/${playerId}`).remove()
     if (isHost) {
       db.ref(`rooms/${roomId}`).remove()
@@ -242,7 +300,8 @@ function cleanupOnlineGame() {
 window.addEventListener("beforeunload", cleanupOnlineGame)
 
 // ===== EXPONER GLOBALMENTE =====
-window.startOnlineGame = startOnlineGame
+window.createRoom = createRoom
+window.joinRoom = joinRoom
 window.sendOnlineState = sendOnlineState
 window.getEnemyDistance = getEnemyDistance
 window.getEnemySpeed = getEnemySpeed
