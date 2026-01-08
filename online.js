@@ -70,7 +70,9 @@ async function createRoom() {
     document.getElementById("crearSalaView")?.classList.add("hidden")
     document.getElementById("unirseSalaView")?.classList.add("hidden")
     document.getElementById("esperandoView")?.classList.remove("hidden")
-    document.getElementById("salaId").textContent = roomId
+    
+const salaEl = document.getElementById("salaId")
+if (salaEl) salaEl.textContent = roomId
 
     updateOnlineStatus("Sala creada. Esperando rival...")
     console.log("[ONLINE] HOST - Sala creada:", roomId)
