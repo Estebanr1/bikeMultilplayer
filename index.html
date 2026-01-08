@@ -1,426 +1,151 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bike Race Game</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Firebase para matchmaking online -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <style>
-        @keyframes road-scroll {
-            0% { background-position: 0 0; }
-            100% { background-position: 0 60px; }
-        }
+  <meta charset="UTF-8" />
+  <title>Bike Race Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-        @keyframes bike-bounce {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-5px); }
-        }
+  <!-- Tailwind CDN (como usabas antes) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-        .bike-racing {
-            animation: bike-bounce 0.3s ease-in-out infinite;
-        }
+  <!-- Firebase CDN -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-        .race-track {
-            background: linear-gradient(to bottom, #4ade80 0%, #22c55e 50%, #16a34a 100%);
-        }
-
-        .road-lines {
-            background-image: repeating-linear-gradient(
-                to bottom,
-                transparent 0px,
-                transparent 20px,
-                #fbbf24 20px,
-                #fbbf24 40px,
-                transparent 40px,
-                transparent 60px
-            );
-            animation: road-scroll 1s linear infinite;
-        }
-
-        .lane {
-            position: relative;
-            background: linear-gradient(to right, #6b7280 0%, #4b5563 50%, #6b7280 100%);
-            border-left: 4px solid #fbbf24;
-            border-right: 4px solid #fbbf24;
-        }
-
-        .finish-line {
-            background: repeating-linear-gradient(45deg, #000, #000 20px, #fff 20px, #fff 40px);
-        }
-
-        .v16-badge {
-            background: linear-gradient(45deg, #22c55e, #3b82f6);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            display: inline-block;
-            margin: 10px 0;
-        }
-
-        .page { display: none; }
-        .page.active { display: block; }
-
-        .progress-bar {
-            height: 16px;
-            background: #e5e7eb;
-            border-radius: 9999px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            transition: width 0.3s ease;
-        }
-
-        .online-status {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            text-align: center;
-        }
-        .online-status.waiting { background: #fef3c7; color: #92400e; }
-        .online-status.connected { background: #d1fae5; color: #065f46; }
-    </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
-    <div id="app" class="container mx-auto px-4 py-8">
-        
-        <!-- Pagina de Inicio -->
-        <div id="inicio" class="page active">
-            <div class="max-w-4xl mx-auto">
-                <div class="text-center mb-8">
-                    <h1 class="text-4xl font-bold text-gray-800 mb-2">Bike Race Game</h1>
-                    <div class="v16-badge">V16 COMPLETE - Vista de Arriba + Online</div>
-                </div>
 
-                <!-- Sensor Connection Card -->
-                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                    <h2 class="text-xl font-semibold mb-4">Conexion del Sensor</h2>
-                    
-                    <div id="estadoConexion" class="mb-4 p-4 rounded-lg bg-blue-100 border border-blue-300">
-                        <span class="text-blue-800">Verificando compatibilidad...</span>
-                    </div>
-                    
-                    <div id="sensorStatus" class="hidden mb-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="p-3 rounded-lg border bg-blue-50">
-                                <div class="text-center">
-                                    <div class="text-2xl mb-1">🔍</div>
-                                    <div class="text-sm font-medium">Sensor HW-511</div>
-                                    <div class="text-xs" id="sensorStatusText">Esperando...</div>
-                                </div>
-                            </div>
-                            <div class="p-3 rounded-lg border bg-gray-50">
-                                <div class="text-center">
-                                    <div id="ledDot" class="w-4 h-4 rounded-full mx-auto mb-1 bg-gray-400"></div>
-                                    <div class="text-sm font-medium">LED NodeMCU</div>
-                                    <div class="text-xs" id="ledStatusText">OFF</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center">
 
-                    <div id="clickCounter" class="hidden mb-4 p-4 bg-blue-100 rounded-lg text-center">
-                        <div id="totalClicks" class="text-3xl font-bold text-blue-800">0</div>
-                        <div class="text-sm text-blue-600">Total Clicks</div>
-                    </div>
-                    
-                    <button id="detectarNodeMCU" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
-                        Conectar Sensor USB
-                    </button>
-                </div>
+<div id="app" class="w-full max-w-4xl mx-auto">
 
-                <!-- Connection Methods -->
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-lg shadow-lg p-6 border-2 border-blue-200 hover:shadow-xl transition-shadow">
-                        <div class="text-center">
-                            <div class="text-5xl mb-4">🔌</div>
-                            <h3 class="text-xl font-bold mb-2">Jugar Local</h3>
-                            <p class="text-gray-600 mb-4">Sensor fisico o clicks manuales</p>
-                            <button id="btnLocal" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
-                                Jugar Local
-                            </button>
-                        </div>
-                    </div>
+  <!-- ================= INICIO ================= -->
+  <section id="inicio" class="page active text-center">
+    <h1 class="text-4xl font-bold mb-6">🚴 Bike Race</h1>
 
-                    <div class="bg-white rounded-lg shadow-lg p-6 border-2 border-purple-200 hover:shadow-xl transition-shadow">
-                        <div class="text-center">
-                            <div class="text-5xl mb-4">🌐</div>
-                            <h3 class="text-xl font-bold mb-2">Multijugador Online</h3>
-                            <p class="text-gray-600 mb-4">Compite con jugadores remotos</p>
-                            <button id="btnOnline" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg">
-                                Jugar Online
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <button id="btnLocal" class="btn-primary">Jugar</button>
+    <button id="btnOnline" class="btn-secondary mt-4">Multijugador Online</button>
+  </section>
 
-        <!-- Pagina de Seleccion de Modo -->
-        <div id="seleccionModo" class="page">
-            <div class="max-w-4xl mx-auto">
-                <h1 class="text-3xl font-bold text-center mb-8">Selecciona el Modo de Juego</h1>
-                
-                <div class="grid md:grid-cols-2 gap-8">
-                    <div class="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow">
-                        <div class="text-center">
-                            <div class="text-6xl mb-4">👤</div>
-                            <h3 class="text-xl font-semibold mb-4">Individual</h3>
-                            <p class="text-gray-600 mb-6">Compite contra el tiempo</p>
-                            <button class="mode-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg" data-mode="single">
-                                Comenzar
-                            </button>
-                        </div>
-                    </div>
+  <!-- ================= SELECCIÓN MODO ================= -->
+  <section id="seleccionModo" class="page hidden text-center">
+    <h2 class="text-2xl mb-6">Seleccionar modo</h2>
 
-                    <div class="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-shadow">
-                        <div class="text-center">
-                            <div class="text-6xl mb-4">👥</div>
-                            <h3 class="text-xl font-semibold mb-4">Multijugador Local</h3>
-                            <p class="text-gray-600 mb-6">2 jugadores: Sensor + Espacio</p>
-                            <button class="mode-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg" data-mode="multi">
-                                Competir
-                            </button>
-                        </div>
-                    </div>
-                </div>
+    <button class="mode-btn btn-primary" data-mode="single">Individual</button>
+    <button class="mode-btn btn-primary mt-3" data-mode="multi">Multijugador Local</button>
 
-                <div class="text-center mt-8">
-                    <button id="volverInicio" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg">
-                        Volver
-                    </button>
-                </div>
-            </div>
-        </div>
+    <button id="volverInicio" class="btn-secondary mt-6">Volver</button>
+  </section>
 
-        <!-- Pagina Online -->
-        <div id="paginaOnline" class="page">
-            <div class="max-w-2xl mx-auto">
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold text-center mb-6">
-                        <span class="text-purple-600">🌐</span> Sala Multijugador Online
-                    </h2>
+  <!-- ================= ONLINE ================= -->
+  <section id="paginaOnline" class="page hidden text-center">
 
-                    <!-- Opciones Crear/Unirse -->
-                    <div id="opcionesView" class="grid grid-cols-2 gap-4">
-                        <button id="btnCrearSala" class="h-24 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg">
-                            <div class="text-center">
-                                <div class="text-2xl mb-1">🏠</div>
-                                <div>Crear Sala</div>
-                            </div>
-                        </button>
-                        <button id="btnUnirseSala" class="h-24 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
-                            <div class="text-center">
-                                <div class="text-2xl mb-1">🚪</div>
-                                <div>Unirse a Sala</div>
-                            </div>
-                        </button>
-                    </div>
+    <h2 class="text-2xl mb-4">Multijugador Online</h2>
 
-                    <!-- Vista Crear Sala -->
-                    <div id="crearSalaView" class="hidden text-center">
-                        <h3 class="text-xl font-bold mb-4">Codigo de Sala</h3>
-                        <div class="bg-purple-100 border-2 border-purple-300 rounded-lg p-6 mb-4">
-                            <div id="codigoSala" class="text-5xl font-mono font-bold text-purple-600 mb-2">----</div>
-                            <p class="text-sm text-gray-600">Comparte este codigo con tu rival</p>
-                        </div>
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <p class="text-sm">Esperando jugador 2...</p>
-                            <p class="text-xs text-gray-600 mt-2">El otro jugador debe ingresar este codigo para conectarse</p>
-                        </div>
-                        <div class="space-y-2">
-                            <button id="btnSimularConexion" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">
-                                Simular Conexion (Demo)
-                            </button>
-                            <button id="btnCancelarCrear" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-lg">
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
+    <div id="onlineStatus" class="mb-4 text-yellow-400"></div>
 
-                    <!-- Vista Unirse a Sala -->
-                    <div id="unirseSalaView" class="hidden">
-                        <label class="block text-sm font-bold mb-2">Codigo de Sala:</label>
-                        <input type="text" id="inputCodigoSala" placeholder="Ingresa el codigo de 4 digitos" maxlength="4" 
-                            class="w-full text-2xl font-mono text-center p-4 border-2 border-gray-300 rounded-lg mb-4 uppercase">
-                        <div class="space-y-2">
-                            <button id="btnConectarSala" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg">
-                                Unirse a la Sala
-                            </button>
-                            <button id="btnCancelarUnirse" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-lg">
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Vista Conectado -->
-                    <div id="conectadoView" class="hidden text-center">
-                        <div class="text-6xl mb-4 animate-pulse">📡</div>
-                        <h3 class="text-2xl font-bold text-green-600 mb-2">Conectado!</h3>
-                        <p class="text-gray-600 mb-4">Sala: <span id="salaConectada" class="font-mono font-bold">----</span></p>
-
-                        <div class="grid grid-cols-2 gap-4 mb-6">
-                            <div class="bg-blue-100 border border-blue-300 rounded-lg p-4">
-                                <div class="text-3xl mb-2">👤</div>
-                                <div class="font-bold">Jugador 1</div>
-                                <div class="text-xs text-green-600" id="p1StatusOnline">Conectado</div>
-                            </div>
-                            <div class="bg-red-100 border border-red-300 rounded-lg p-4">
-                                <div class="text-3xl mb-2">👤</div>
-                                <div class="font-bold">Jugador 2</div>
-                                <div class="text-xs text-green-600" id="p2StatusOnline">Conectado</div>
-                            </div>
-                        </div>
-
-                        <button id="btnIniciarOnline" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">
-                            Iniciar Carrera
-                        </button>
-                    </div>
-                </div>
-
-                <div class="text-center mt-4">
-                    <button id="volverDesdeOnline" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg">
-                        Volver
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pagina de Carrera - Vista de Arriba -->
-        <div id="juegoCarrera" class="page">
-            <div class="max-w-4xl mx-auto">
-                <!-- HUD -->
-                <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
-                    <div class="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <div class="text-sm text-gray-600">Tiempo</div>
-                            <div id="tiempoRestante" class="text-3xl font-bold text-red-600">60</div>
-                        </div>
-                        <div>
-                            <div class="text-sm text-gray-600">Meta</div>
-                            <div class="text-xl font-bold text-green-600">1000m</div>
-                        </div>
-                        <div>
-                            <div class="text-sm text-gray-600">Modo</div>
-                            <div id="modoDisplay" class="text-xl font-bold text-purple-600">Individual</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Race Track - Vista de Arriba -->
-                <div class="bg-white rounded-lg shadow-2xl overflow-hidden" style="height: 500px;">
-                    <div class="relative h-full race-track">
-                        <!-- Road lines animation -->
-                        <div class="absolute inset-0 road-lines pointer-events-none"></div>
-
-                        <!-- Finish Line -->
-                        <div class="absolute top-0 left-0 right-0 h-8 finish-line flex items-center justify-center">
-                            <span class="text-white font-bold text-xs bg-black/50 px-2 py-1 rounded">META</span>
-                        </div>
-
-                        <!-- Lanes Container -->
-                        <div id="lanesContainer" class="absolute inset-0 flex">
-                            <!-- Lane 1 -->
-                            <div id="lane1" class="flex-1 relative lane">
-                                <div id="player1Container" class="absolute left-1/2 -translate-x-1/2 transition-all duration-300" style="bottom: 5%;">
-                                    <div class="text-center">
-                                        <div class="text-5xl" id="bike1">🚴‍♂️</div>
-                                        <div class="mt-1 bg-blue-600 text-white px-2 py-1 rounded text-xs">Jugador 1</div>
-                                        <div class="text-xs mt-1 space-x-1">
-                                            <span id="p1Speed" class="bg-white/80 px-2 py-1 rounded">0 km/h</span>
-                                            <span id="p1Dist" class="bg-white/80 px-2 py-1 rounded">0m</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Lane 2 (for multiplayer) -->
-                            <div id="lane2" class="flex-1 relative lane hidden">
-                                <div id="player2Container" class="absolute left-1/2 -translate-x-1/2 transition-all duration-300" style="bottom: 5%;">
-                                    <div class="text-center">
-                                        <div class="text-5xl" id="bike2">🚴</div>
-                                        <div class="mt-1 bg-red-600 text-white px-2 py-1 rounded text-xs">Jugador 2</div>
-                                        <div class="text-xs mt-1 space-x-1">
-                                            <span id="p2Speed" class="bg-white/80 px-2 py-1 rounded">0 km/h</span>
-                                            <span id="p2Dist" class="bg-white/80 px-2 py-1 rounded">0m</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Progress Bars -->
-                <div class="bg-white rounded-lg shadow-lg p-4 mt-4">
-                    <div id="progressBars" class="space-y-4">
-                        <div id="progressP1">
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="font-bold text-blue-600">Jugador 1</span>
-                                <span id="p1Percent">0%</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div id="p1ProgressFill" class="progress-fill bg-blue-600" style="width: 0%;"></div>
-                            </div>
-                        </div>
-                        <div id="progressP2" class="hidden">
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="font-bold text-red-600">Jugador 2</span>
-                                <span id="p2Percent">0%</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div id="p2ProgressFill" class="progress-fill bg-red-600" style="width: 0%;"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Controls -->
-                <div id="gameControls" class="mt-4 grid grid-cols-2 gap-4">
-                    <button id="btnP1Click" class="h-20 text-xl bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
-                        🚴‍♂️ Jugador 1 (Click/Sensor)
-                    </button>
-                    <button id="btnP2Click" class="h-20 text-xl bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg hidden">
-                        🚴 Jugador 2 (Espacio)
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pagina de Resultados -->
-        <div id="resultados" class="page">
-            <div class="max-w-2xl mx-auto">
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-3xl font-bold text-center mb-6">Resultados</h2>
-                    
-                    <div id="winnerDisplay" class="text-center mb-8">
-                        <div class="text-6xl mb-4">🏆</div>
-                        <h3 id="winnerText" class="text-2xl font-bold"></h3>
-                    </div>
-
-                    <div id="resultsTable" class="space-y-4 mb-8"></div>
-
-                    <div class="space-y-2">
-                        <button id="btnPlayAgain" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">
-                            Jugar de Nuevo
-                        </button>
-                        <button id="btnBackHome" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-lg">
-                            Volver al Inicio
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+    <!-- Opciones -->
+    <div id="opcionesView">
+      <button id="btnCrearSala" class="btn-primary">Crear Sala</button>
+      <button id="btnUnirseSala" class="btn-primary mt-3">Unirse a Sala</button>
     </div>
 
-    <script src="online.js"></script>
-    <script src="game.js"></script>
+    <!-- Crear sala -->
+    <div id="crearSalaView" class="hidden">
+      <p class="mt-4">Creando sala...</p>
+    </div>
+
+    <!-- Esperando -->
+    <div id="esperandoView" class="hidden">
+      <p class="mt-4">Esperando rival</p>
+      <p class="mt-2 text-xl">Código: <span id="salaId" class="font-bold"></span></p>
+    </div>
+
+    <!-- Unirse -->
+    <div id="unirseSalaView" class="hidden">
+      <input id="inputCodigoSala" maxlength="4"
+        class="text-black px-4 py-2 rounded"
+        placeholder="Código sala" />
+      <button id="btnConectarSala" class="btn-primary mt-3">Conectar</button>
+    </div>
+
+    <!-- Conectado -->
+    <div id="conectadoView" class="hidden">
+      <p id="miRol" class="mb-2"></p>
+      <p>Jugador 1: <span id="p1StatusOnline">—</span></p>
+      <p>Jugador 2: <span id="p2StatusOnline">—</span></p>
+
+      <button id="btnIniciarOnline" class="btn-primary mt-4">Iniciar Carrera</button>
+    </div>
+
+    <button id="volverDesdeOnline" class="btn-secondary mt-6">Volver</button>
+  </section>
+
+  <!-- ================= JUEGO ================= -->
+  <section id="juegoCarrera" class="page hidden">
+
+    <div class="flex justify-between mb-2">
+      <div>Modo: <span id="modoDisplay"></span></div>
+      <div>Tiempo: <span id="tiempoRestante">60</span>s</div>
+    </div>
+
+    <div class="track">
+
+      <!-- Player 1 -->
+      <div class="lane" id="lane1">
+        <div id="player1Container" class="player">
+          <img id="bike1" src="https://i.imgur.com/9XnQZ5H.png" class="bike" />
+        </div>
+      </div>
+
+      <!-- Player 2 -->
+      <div class="lane hidden" id="lane2">
+        <div id="player2Container" class="player">
+          <img id="bike2" src="https://i.imgur.com/9XnQZ5H.png" class="bike red" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 gap-4 mt-4">
+      <div>
+        <h3>Jugador 1</h3>
+        <p id="p1Speed">0 km/h</p>
+        <p id="p1Dist">0 m</p>
+        <div class="progress"><div id="p1ProgressFill"></div></div>
+        <p id="p1Percent">0%</p>
+      </div>
+
+      <div id="progressP2" class="hidden">
+        <h3>Jugador 2</h3>
+        <p id="p2Speed">0 km/h</p>
+        <p id="p2Dist">0 m</p>
+        <div class="progress"><div id="p2ProgressFill"></div></div>
+        <p id="p2Percent">0%</p>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="mt-4 flex justify-center gap-4">
+      <button id="btnP1Click" class="btn-primary">Pedalear P1</button>
+      <button id="btnP2Click" class="btn-primary hidden">Pedalear P2</button>
+    </div>
+  </section>
+
+  <!-- ================= RESULTADOS ================= -->
+  <section id="resultados" class="page hidden text-center">
+    <h2 id="winnerText" class="text-3xl mb-4"></h2>
+    <div id="resultsTable" class="mb-4"></div>
+
+    <button id="btnPlayAgain" class="btn-primary">Jugar otra vez</button>
+    <button id="btnBackHome" class="btn-secondary mt-3">Inicio</button>
+  </section>
+
+</div>
+
+<!-- Scripts -->
+<script src="game.js"></script>
+<script type="module" src="online.js"></script>
+
 </body>
 </html>
