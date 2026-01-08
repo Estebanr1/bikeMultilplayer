@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📡 Guía de Conexión Sensor HW-511</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-green-50 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-satellite-dish text-blue-600"></i>
+                Guía de Conexión Sensor HW-511
+            </h1>
+            <p class="text-lg text-gray-600">Paso a paso para conectar tu sensor infrarrojo</p>
+        </div>
+
+        <!-- Paso 1: Hardware -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h2 class="text-2xl font-bold text-blue-600 mb-4">
+                <span class="bg-blue-600 text-white rounded-full w-8 h-8 inline-flex items-center justify-center mr-2">1</span>
+                Conexión del Hardware
+            </h2>
+            
+            <div class="space-y-4">
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">📌 Pines del Sensor HW-511:</h3>
+                    <ul class="space-y-2">
+                        <li class="flex items-center">
+                            <span class="bg-red-500 text-white px-3 py-1 rounded mr-3 font-mono">VCC</span>
+                            <span>→ Conectar a <strong>3.3V</strong> del NodeMCU</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="bg-black text-white px-3 py-1 rounded mr-3 font-mono">GND</span>
+                            <span>→ Conectar a <strong>GND</strong> del NodeMCU</span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="bg-green-500 text-white px-3 py-1 rounded mr-3 font-mono">OUT</span>
+                            <span>→ Conectar a <strong>D2</strong> del NodeMCU</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p class="text-sm">
+                        <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                        <strong>IMPORTANTE:</strong> Usa 3.3V, NO 5V (puede dañar el NodeMCU)
+                    </p>
+                </div>
+
+                <div class="bg-gray-100 rounded-lg p-4">
+                    <h4 class="font-bold mb-2">🔧 Diagrama de Conexión:</h4>
+                    <pre class="text-sm font-mono bg-white p-4 rounded border">
+NodeMCU          HW-511
+=======          ======
+3.3V    ------>  VCC (Rojo)
+GND     ------>  GND (Negro)
+D2      ------>  OUT (Verde/Amarillo)
+                    </pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paso 2: Código Arduino -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h2 class="text-2xl font-bold text-green-600 mb-4">
+                <span class="bg-green-600 text-white rounded-full w-8 h-8 inline-flex items-center justify-center mr-2">2</span>
+                Subir Código al NodeMCU
+            </h2>
+
+            <div class="space-y-4">
+                <div class="border-l-4 border-green-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">📝 Instrucciones:</h3>
+                    <ol class="list-decimal list-inside space-y-2">
+                        <li>Abre el <strong>Arduino IDE</strong></li>
+                        <li>Selecciona <strong>Herramientas → Placa → NodeMCU 1.0 (ESP-12E Module)</strong></li>
+                        <li>Selecciona el <strong>Puerto COM</strong> correcto</li>
+                        <li>Copia el código de abajo</li>
+                        <li>Haz clic en <strong>Subir</strong> (→)</li>
+                    </ol>
+                </div>
+
+                <div class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
+                    <pre class="text-sm">
+// ===== CÓDIGO NODEMCU PARA SENSOR HW-511 V15 STABLE =====
+const int sensorPin = D2;      // Pin del sensor
+const int ledPin = LED_BUILTIN; // LED integrado
+
+bool lastState = HIGH;
+unsigned long lastTime = 0;
+
+void setup() {
+  // Inicializar comunicación serial
+  Serial.begin(115200);
+  
+  // Configurar pines
+  pinMode(sensorPin, INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, HIGH); // LED apagado (HIGH = apagado en NodeMCU)
+  
+  // Esperar estabilización
+  delay(2000);
+  
+  Serial.println("Sistema V15 STABLE listo para detectar sensor");
+  Serial.flush();
+  delay(500);
+  Serial.println("NodeMCU inicializado correctamente");
+  Serial.flush();
+}
+
+void loop() {
+  // Leer estado actual del sensor
+  bool currentState = digitalRead(sensorPin);
+  
+  // Detectar cambio de HIGH a LOW (objeto detectado)
+  if (currentState == LOW && lastState == HIGH) {
+    // Anti-rebote: solo procesar si pasaron más de 300ms
+    if (millis() - lastTime > 300) {
+      // Enviar "click" por serial
+      Serial.println("click");
+      Serial.flush(); // Envío inmediato
+      
+      // Parpadear LED para feedback visual
+      digitalWrite(ledPin, LOW);  // Encender
+      delay(100);
+      digitalWrite(ledPin, HIGH); // Apagar
+      
+      lastTime = millis();
+    }
+  }
+  
+  lastState = currentState;
+  
+  // Procesar comandos desde la aplicación web
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    
+    if (cmd == "TEST_SENSOR") {
+      // Simular activación del sensor
+      Serial.println("click");
+      Serial.flush();
+      digitalWrite(ledPin, LOW);
+      delay(200);
+      digitalWrite(ledPin, HIGH);
+      Serial.println("Prueba completada");
+      Serial.flush();
+    }
+    else if (cmd == "STATUS") {
+      // Reportar estado actual
+      Serial.print("Sensor estado: ");
+      Serial.println(digitalRead(sensorPin) ? "HIGH" : "LOW");
+      Serial.print("LED estado: ");
+      Serial.println(digitalRead(ledPin) ? "OFF" : "ON");
+      Serial.flush();
+    }
+  }
+  
+  delay(10); // Pequeño delay para estabilidad
+}
+                    </pre>
+                </div>
+
+                <button onclick="copiarCodigo()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">
+                    <i class="fas fa-copy mr-2"></i>
+                    Copiar Código
+                </button>
+            </div>
+        </div>
+
+        <!-- Paso 3: Verificación -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h2 class="text-2xl font-bold text-purple-600 mb-4">
+                <span class="bg-purple-600 text-white rounded-full w-8 h-8 inline-flex items-center justify-center mr-2">3</span>
+                Verificar Funcionamiento
+            </h2>
+
+            <div class="space-y-4">
+                <div class="border-l-4 border-purple-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">🔍 Prueba del Sensor (sin aplicación):</h3>
+                    <ol class="list-decimal list-inside space-y-2">
+                        <li>Abre <strong>Monitor Serie</strong> (Herramientas → Monitor Serie)</li>
+                        <li>Configura velocidad a <strong>115200 baudios</strong></li>
+                        <li>Deberías ver: <code class="bg-gray-100 px-2 py-1 rounded">"Sistema V15 STABLE listo para detectar sensor"</code></li>
+                        <li><strong>Pasa tu mano</strong> frente al sensor HW-511</li>
+                        <li>Deberías ver: <code class="bg-green-100 px-2 py-1 rounded text-green-700">"click"</code></li>
+                        <li>El LED del NodeMCU debería <strong>parpadear</strong></li>
+                    </ol>
+                </div>
+
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-sm">
+                        <i class="fas fa-check-circle text-green-600"></i>
+                        <strong>¿Funciona en el Monitor Serie?</strong> ¡Perfecto! Ya puedes usarlo con la aplicación.
+                    </p>
+                </div>
+
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-sm">
+                        <i class="fas fa-times-circle text-red-600"></i>
+                        <strong>¿No funciona?</strong> Revisa la sección de solución de problemas abajo.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paso 4: Conectar a la Aplicación -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h2 class="text-2xl font-bold text-orange-600 mb-4">
+                <span class="bg-orange-600 text-white rounded-full w-8 h-8 inline-flex items-center justify-center mr-2">4</span>
+                Conectar a la Aplicación Web
+            </h2>
+
+            <div class="space-y-4">
+                <div class="border-l-4 border-orange-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">🌐 Pasos en la Aplicación:</h3>
+                    <ol class="list-decimal list-inside space-y-2">
+                        <li><strong>Cierra el Monitor Serie</strong> del Arduino IDE (importante)</li>
+                        <li>Abre <strong>index.html</strong> en Chrome o Edge</li>
+                        <li>Haz clic en <strong>"Conectar NodeMCU V15 STABLE por USB"</strong></li>
+                        <li>Selecciona el puerto COM del NodeMCU en el diálogo</li>
+                        <li>Espera a ver: <span class="bg-green-100 px-2 py-1 rounded text-green-700">✅ NodeMCU conectado!</span></li>
+                        <li>Haz clic en <strong>"🧪 Probar"</strong> para verificar</li>
+                        <li>Deberías ver el contador de clicks aumentar</li>
+                        <li>¡Ahora puedes jugar activando el sensor físico!</li>
+                    </ol>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="font-bold mb-2">🎮 Para Jugar:</h4>
+                        <ul class="text-sm space-y-1">
+                            <li>✅ Conexión OK</li>
+                            <li>✅ Sensor detectando clicks</li>
+                            <li>✅ LED parpadeando</li>
+                            <li>✅ Contador aumentando</li>
+                        </ul>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <h4 class="font-bold mb-2">⚠️ Recuerda:</h4>
+                        <ul class="text-sm space-y-1">
+                            <li>• Cerrar Monitor Serie</li>
+                            <li>• Usar Chrome/Edge</li>
+                            <li>• Ventana normal (no iframe)</li>
+                            <li>• NodeMCU conectado por USB</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solución de Problemas -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+            <h2 class="text-2xl font-bold text-red-600 mb-4">
+                <i class="fas fa-wrench"></i>
+                Solución de Problemas
+            </h2>
+
+            <div class="space-y-4">
+                <div class="border-l-4 border-red-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">❌ Problema: No detecta nada en Monitor Serie</h3>
+                    <ul class="list-disc list-inside space-y-1 text-sm">
+                        <li>Verifica las conexiones físicas (VCC, GND, OUT)</li>
+                        <li>Asegúrate de usar <strong>3.3V</strong>, no 5V</li>
+                        <li>Revisa que el cable USB sea de datos (no solo de carga)</li>
+                        <li>Prueba otro puerto USB de tu computadora</li>
+                        <li>Verifica velocidad de 115200 baudios en Monitor Serie</li>
+                    </ul>
+                </div>
+
+                <div class="border-l-4 border-orange-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">⚠️ Problema: Detecta pero no se ve en la app</h3>
+                    <ul class="list-disc list-inside space-y-1 text-sm">
+                        <li><strong>Cierra el Monitor Serie del Arduino IDE</strong></li>
+                        <li>Solo un programa puede usar el puerto serial a la vez</li>
+                        <li>Refresca la página web y reconecta</li>
+                    </ul>
+                </div>
+
+                <div class="border-l-4 border-yellow-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">⚠️ Problema: Sensor muy sensible o poco sensible</h3>
+                    <ul class="list-disc list-inside space-y-1 text-sm">
+                        <li>El HW-511 tiene un potenciómetro ajustable</li>
+                        <li>Gíralo con un destornillador pequeño para ajustar sensibilidad</li>
+                        <li>Prueba diferentes distancias (5-30cm)</li>
+                    </ul>
+                </div>
+
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <h3 class="font-bold text-lg mb-2">💡 Problema: Web Serial API no disponible</h3>
+                    <ul class="list-disc list-inside space-y-1 text-sm">
+                        <li>Usa <strong>Chrome</strong> o <strong>Edge</strong> (Firefox no soporta Web Serial)</li>
+                        <li>Abre el archivo directamente, no en iframe</li>
+                        <li>Si es necesario, usa un servidor local (Live Server en VSCode)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Interactivo -->
+        <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-lg p-8 text-white">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-vial"></i>
+                Test Rápido del Sensor
+            </h2>
+            <p class="mb-4">Haz clic para probar si tu NodeMCU está listo:</p>
+            
+            <div class="space-y-3">
+                <a href="index.html" class="block bg-white text-blue-600 hover:bg-blue-50 font-bold py-3 px-6 rounded-lg text-center transition-colors">
+                    <i class="fas fa-play-circle mr-2"></i>
+                    Abrir Aplicación de Juego
+                </a>
+                
+                <div class="bg-white/20 rounded-lg p-4">
+                    <h3 class="font-bold mb-2">✅ Checklist Final:</h3>
+                    <ul class="space-y-1 text-sm">
+                        <li>☐ Hardware conectado correctamente</li>
+                        <li>☐ Código subido al NodeMCU</li>
+                        <li>☐ Sensor detecta en Monitor Serie</li>
+                        <li>☐ Monitor Serie cerrado</li>
+                        <li>☐ Chrome o Edge abierto</li>
+                        <li>☐ Listo para conectar en la app</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Adicional -->
+        <div class="mt-8 text-center text-gray-600 text-sm">
+            <p>
+                <i class="fas fa-info-circle"></i>
+                <strong>Versión 15 STABLE</strong> - Código probado y funcionando
+            </p>
+            <p class="mt-2">
+                ¿Necesitas ayuda? Revisa los logs de conexión en la aplicación
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function copiarCodigo() {
+            const codigo = document.querySelector('.bg-gray-900 pre').textContent;
+            navigator.clipboard.writeText(codigo).then(() => {
+                alert('✅ Código copiado al portapapeles!\n\nAhora pégalo en el Arduino IDE y súbelo al NodeMCU.');
+            }).catch(() => {
+                alert('❌ No se pudo copiar automáticamente.\nPor favor, selecciona y copia el código manualmente.');
+            });
+        }
+    </script>
+</body>
+</html>

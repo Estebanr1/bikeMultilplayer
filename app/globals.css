@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados para el juego V12 MULTIJUGADOR */
+@layer base {
+  html {
+    font-family: system-ui, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .race-track {
+    background: linear-gradient(to bottom, #4ade80 0%, #22c55e 50%, #16a34a 100%);
+  }
+
+  .bike-shadow {
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  }
+
+  .speed-trail {
+    background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.6) 50%, transparent 100%);
+  }
+
+  .winner-glow {
+    animation: winner-pulse 2s infinite;
+  }
+
+  .road-lines {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 20px,
+      #fbbf24 20px,
+      #fbbf24 40px,
+      transparent 40px,
+      transparent 60px
+    );
+    animation: road-scroll 1s linear infinite;
+  }
+}
+
+@keyframes winner-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 30px rgba(255, 215, 0, 1));
+  }
+}
+
+@keyframes road-scroll {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 60px;
+  }
+}
+
+/* Animaciones de bicicletas */
+.bike-pedaling {
+  animation: bike-pedal 0.3s ease-in-out infinite;
+}
+
+@keyframes bike-pedal {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(-1deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(1deg);
+  }
+}
+
+/* Efectos de velocidad */
+.speed-boost {
+  animation: speed-boost 0.5s ease-out;
+}
+
+@keyframes speed-boost {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.2);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .race-track {
+    font-size: 0.8rem;
+  }
+
+  .bike-player {
+    font-size: 3rem;
+  }
+}
