@@ -1,6 +1,10 @@
 // ===== GAME.JS - V16 COMPLETE =====
 console.log("[GAME] Cargando V16 COMPLETE...")
 
+function isOnlineHost() {
+  return window.isGameHost?.()
+}
+
 // Estado del juego
 const gameState = {
   // Conexion sensor
@@ -155,7 +159,20 @@ function updateClickDisplay() {
 function handlePlayerInput(playerNum) {
   if (!gameState.gameActive) return
 
-  const player = playerNum === 1 ? gameState.player1 : gameState.player2
+  const isHost = isOnlineHost()
+
+// En online:
+// Host controla player1
+// Guest controla player2
+const player =
+  gameState.gameMode === "online"
+    ? isHost
+      ? gameState.player1
+      : gameState.player2
+    : playerNum === 1
+    ? gameState.player1
+    : gameState.player2
+
   const now = Date.now()
   const timeDiff = now - gameState.lastInputTime
 
@@ -195,18 +212,23 @@ function handlePlayerInput(playerNum) {
 
 // Para recibir datos del enemigo online
 window.updateEnemyDisplay = (enemyState) => {
-  if (!gameState.gameActive) return
+  if (!gameState.gameActive || gameState.gameMode !== "online") return
 
-  gameState.player2.distancia = enemyState.distance || 0
-  gameState.player2.velocidad = enemyState.speed || 0
-  gameState.player2.position = (gameState.player2.distancia / gameState.raceDistance) * 100
+  const isHost = isOnlineHost()
+  const enemyPlayer = isHost ? gameState.player2 : gameState.player1
+
+  enemyPlayer.distancia = enemyState.distance || 0
+  enemyPlayer.velocidad = enemyState.speed || 0
+  enemyPlayer.position =
+    (enemyPlayer.distancia / gameState.raceDistance) * 100
 
   updateDisplay()
 
-  if (gameState.player2.distancia >= gameState.raceDistance) {
-    endGame(2)
+  if (enemyPlayer.distancia >= gameState.raceDistance) {
+    endGame(isHost ? 2 : 1)
   }
 }
+
 
 function updateDisplay() {
   const p1 = gameState.player1
