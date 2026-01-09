@@ -72,26 +72,27 @@ async function joinRoom(code) {
 // ===== Escuchar jugadores =====
 // ===== Escuchar jugadores =====
 function listenPlayers() {
-  db.ref(`rooms/${roomId}/players`).on("value", (snap) => {
+  db.ref(`rooms/${roomId}`).on("value", (snap) => {
     if (!snap.exists()) return
 
-    const players = snap.val()
+    const room = snap.val()
+    const players = room.players || {}
     const playerCount = Object.keys(players).length
 
     onlineReady = playerCount === 2
 
-    // 🔹 Si ya hay 2 jugadores y soy el host, inicio la partida
-    if (onlineReady && isHost && !gameStarted) {
+    const started = room.gameStarted === true
+
+    // 🔹 HOST: si hay 2 jugadores y aún no inició, inicia
+    if (onlineReady && isHost && !started) {
       console.log("[ONLINE] Host detecta 2 jugadores. Iniciando juego...")
 
       db.ref(`rooms/${roomId}`).update({
         gameStarted: true,
       })
 
-      gameStarted = true
-
       // Avisar al game.js
-      if (window.onOnlineReady) {
+      if (typeof window.onOnlineReady === "function") {
         window.onOnlineReady()
       }
     }
