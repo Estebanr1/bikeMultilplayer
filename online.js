@@ -1,7 +1,5 @@
 let roomId = null
-let playerId = null
-let isHost = false
-let onlineReady = false
+
 let gameStarted = false
 
 // ===== ONLINE.JS – V16 STABLE =====
@@ -16,7 +14,7 @@ firebase.initializeApp({
 const db = firebase.database()
 
 // Estado online
-let roomId = null
+
 let playerId = "p" + Math.floor(Math.random() * 100000)
 let isHost = false
 let onlineReady = false
