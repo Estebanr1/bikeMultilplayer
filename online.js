@@ -1,5 +1,12 @@
+let roomId = null
+let playerId = null
+let isHost = false
+let onlineReady = false
+let gameStarted = false
+
 // ===== ONLINE.JS – V16 STABLE =====
 console.log("[ONLINE] Cargando modulo online V16 STABLE")
+
 
 // Firebase init
 firebase.initializeApp({
@@ -19,22 +26,37 @@ console.log("[ONLINE] Player ID:", playerId)
 
 // ===== Crear sala =====
 async function createRoom() {
-  roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
-  isHost = true
-  onlineReady = false
+  try {
+    isHost = true
+    gameStarted = false
 
-  await db.ref(`rooms/${roomId}`).set({
-    created: Date.now(),
-    host: playerId,
-    players: {
-      [playerId]: { speed: 0, distance: 0 },
-    },
-    gameStarted: false,
-  })
+    roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
+    console.log("[ONLINE] HOST - Sala creada:", roomId)
 
-  console.log("[ONLINE] Sala creada:", roomId)
-  listenPlayers()
+    await db.ref(`rooms/${roomId}`).set({
+      created: Date.now(),
+      host: playerId,
+      gameStarted: false,
+      players: {
+        [playerId]: { speed: 0, distance: 0 },
+      },
+    })
+
+    // 🔴 ESTO ES CLAVE
+    const codeEl = document.getElementById("codigoSala")
+    if (codeEl) {
+      codeEl.textContent = roomId
+    } else {
+      console.error("[ONLINE] codigoSala no existe en el DOM")
+    }
+
+    listenPlayers()
+  } catch (err) {
+    console.error("[ONLINE] Error creando sala:", err)
+    alert("Error creando sala")
+  }
 }
+
 
 // ===== Unirse a sala =====
 async function joinRoom(code) {
