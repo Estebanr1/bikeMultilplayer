@@ -1,115 +1,106 @@
-// ===== GAME.JS – V16 ESTABLE =====
-console.log("[GAME] Cargando V16 ESTABLE")
+console.log("[GAME] Cargando V16 ONLINE SYNC")
 
-let gameActive = false
-let gameMode = null
-let timer = null
-let timeLeft = 60
+let mode = "single"
+let gameRunning = false
+let startTimestamp = null
 
-let player1 = { speed: 0, distance: 0 }
-let player2 = { speed: 0, distance: 0 }
+let clicks = 0
+let distance = 0
+let speed = 0
 
-// ===== UI =====
-function showPage(id) {
-  document.querySelectorAll(".page").forEach(p => {
-    p.classList.remove("active")
-    p.classList.add("hidden")
-  })
-  const page = document.getElementById(id)
-  page?.classList.remove("hidden")
-  page?.classList.add("active")
-}
+// ===== START GAME =====
+function startGame(selectedMode) {
+  mode = selectedMode
+  gameRunning = true
+  clicks = 0
+  distance = 0
+  speed = 0
 
-// ===== JUEGO =====
-function startGame(mode) {
-  console.log("[GAME] startGame:", mode)
+  document.getElementById("inicio").classList.remove("active")
+  document.getElementById("paginaOnline").classList.remove("active")
+  document.getElementById("juegoCarrera").classList.add("active")
 
-  gameMode = mode
-  gameActive = true
-  timeLeft = 60
-
-  player1 = { speed: 0, distance: 0 }
-  player2 = { speed: 0, distance: 0 }
-
-  showPage("juegoCarrera")
-
-  clearInterval(timer)
-  timer = setInterval(() => {
-    timeLeft--
-    document.getElementById("tiempoRestante").textContent = timeLeft
-    if (timeLeft <= 0) endGame()
-  }, 1000)
-}
-
-function endGame() {
-  console.log("[GAME] endGame")
-  gameActive = false
-  clearInterval(timer)
-  showPage("resultados")
-}
-
-// ===== ONLINE =====
-window.startOnlineRace = () => {
-  console.log("[GAME] startOnlineRace recibido")
-  startGame("online")
-}
-
-window.updateEnemyDisplay = (enemy) => {
-  if (!gameActive) return
-  player2.distance = enemy.distance || 0
-  player2.speed = enemy.speed || 0
-}
-
-// ===== EVENTOS =====
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("[GAME] DOM READY")
-
-  document.getElementById("btnLocal")?.addEventListener("click", () => {
-    showPage("seleccionModo")
-  })
-
-  document.getElementById("btnOnline")?.addEventListener("click", () => {
-    showPage("paginaOnline")
-  })
-
-  document.querySelectorAll(".mode-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      startGame(btn.dataset.mode)
+  if (mode === "online") {
+    firebase.database().ref(`rooms/${roomId}/startTime`).once("value").then((snap) => {
+      startTimestamp = snap.val()
+      startTimer()
     })
-  })
+  } else {
+    startTimestamp = Date.now()
+    startTimer()
+  }
+}
 
-  document.getElementById("btnCrearSala")?.addEventListener("click", () => {
-    document.getElementById("opcionesView").classList.add("hidden")
-    document.getElementById("crearSalaView").classList.remove("hidden")
-    window.createRoom?.()
-  })
+// ===== TIMER (SYNC ONLINE) =====
+function startTimer() {
+  const tiempoEl = document.getElementById("tiempoRestante")
 
-  document.getElementById("btnUnirseSala")?.addEventListener("click", () => {
-    document.getElementById("opcionesView").classList.add("hidden")
-    document.getElementById("unirseSalaView").classList.remove("hidden")
-  })
-
-  document.getElementById("btnConectarSala")?.addEventListener("click", () => {
-    const code = document.getElementById("inputCodigoSala").value
-    window.joinRoom?.(code)
-    document.getElementById("unirseSalaView").classList.add("hidden")
-    document.getElementById("conectadoView").classList.remove("hidden")
-  })
-
-  document.getElementById("btnIniciarOnline")?.addEventListener("click", () => {
-    if (window.isGameHost?.()) {
-      window.hostStartGame?.()
+  const interval = setInterval(() => {
+    if (!gameRunning) {
+      clearInterval(interval)
+      return
     }
-  })
 
-  document.getElementById("btnPlayAgain")?.addEventListener("click", () => {
-    showPage("inicio")
-  })
+    const elapsed = Math.floor((Date.now() - startTimestamp) / 1000)
+    const remaining = Math.max(0, 60 - elapsed)
 
-  document.getElementById("btnBackHome")?.addEventListener("click", () => {
-    window.cleanupOnlineGame?.()
-    showPage("inicio")
-  })
+    tiempoEl.textContent = remaining
+
+    if (remaining <= 0) {
+      endGame()
+      clearInterval(interval)
+    }
+  }, 250)
+}
+
+// ===== INPUT =====
+function handleClick() {
+  if (!gameRunning) return
+
+  clicks++
+  speed = 20
+  distance += 5
+
+  updateUI()
+
+  if (mode === "online") {
+    firebase.database().ref(`rooms/${roomId}/players/${playerId}`).update({
+      clicks,
+      distance,
+      speed,
+    })
+  }
+}
+
+// ===== UPDATE UI =====
+function updateUI() {
+  document.getElementById("p1Dist").textContent = distance + "m"
+  document.getElementById("p1Speed").textContent = speed + " km/h"
+}
+
+// ===== ENEMY =====
+window.updateEnemyDisplay = function (enemy) {
+  document.getElementById("p2Dist").textContent = enemy.distance + "m"
+  document.getElementById("p2Speed").textContent = enemy.speed + " km/h"
+}
+
+// ===== END =====
+function endGame() {
+  gameRunning = false
+  document.getElementById("juegoCarrera").classList.remove("active")
+  document.getElementById("resultados").classList.add("active")
+}
+
+// ===== EVENTS =====
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btnP1Click").onclick = handleClick
+  document.getElementById("btnIniciarOnline").onclick = () => {
+    if (window.startOnlineGame) {
+      window.startOnlineGame()
+    }
+  }
 })
 
-console.log("[GAME] V16 ESTABLE cargado")
+window.startGame = startGame
+
+console.log("[GAME] V16 ONLINE SYNC cargado")
