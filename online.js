@@ -1,51 +1,45 @@
-// ===== ONLINE.JS - V16 HOST AUTHORITY (SINCRONIZACION POR STARTTIME) =====
-console.log("[ONLINE] Cargando modulo online V16 HOST AUTHORITY...")
+// ===== ONLINE.JS - V16 FINAL FIXED =====
+console.log("[ONLINE] Cargando modulo online V16 FINAL FIXED")
 
-// Firebase config
-const firebaseConfig = {
-  databaseURL: "https://bicigame-a06d7-default-rtdb.firebaseio.com",
+// ===============================
+// Firebase init (UNA SOLA VEZ)
+// ===============================
+const firebase = require("firebase/app")
+require("firebase/database")
+if (!firebase.apps.length) {
+  firebase.initializeApp({
+    databaseURL: "https://bicigame-a06d7-default-rtdb.firebaseio.com",
+  })
 }
+const db = firebase.database()
 
-const firebase = window.firebase
-let db
-
-try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig)
-  }
-  db = firebase.database()
-  console.log("[ONLINE] Firebase conectado")
-} catch (error) {
-  console.error("[ONLINE] Error Firebase:", error)
-}
-
-// Estado
+// ===============================
+// Estado global
+// ===============================
 let roomId = null
 const playerId = "p" + Math.floor(Math.random() * 100000)
 let isHost = false
 let onlineReady = false
 let gameStarted = false
 let startTime = null
+
 let enemyState = { speed: 0, distance: 0 }
 
 console.log("[ONLINE] Player ID:", playerId)
 
-// ===== CREAR SALA (HOST) =====
+// ===============================
+// Crear sala (HOST)
+// ===============================
 async function createRoom() {
-  if (!db) {
-    alert("Firebase no conectado")
-    return
-  }
-
-  roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
-  isHost = true
-  onlineReady = false
-  gameStarted = false
-  startTime = null
-
-  console.log("[ONLINE] HOST creando sala:", roomId)
-
   try {
+    isHost = true
+    onlineReady = false
+    gameStarted = false
+    startTime = null
+    roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
+
+    console.log("[ONLINE] HOST - Sala creada:", roomId)
+
     await db.ref(`rooms/${roomId}`).set({
       created: Date.now(),
       host: playerId,
@@ -57,101 +51,83 @@ async function createRoom() {
       },
     })
 
-    // Actualizar UI
-    document.getElementById("codigoSala").textContent = roomId
-    document.getElementById("opcionesView")?.classList.add("hidden")
-    document.getElementById("crearSalaView")?.classList.remove("hidden")
+    const codeEl = document.getElementById("codigoSala")
+    if (codeEl) codeEl.textContent = roomId
 
-    console.log("[ONLINE] Sala creada, esperando rival...")
     listenRoom()
-  } catch (error) {
-    console.error("[ONLINE] Error creando sala:", error)
+    return true
+  } catch (err) {
+    console.error("[ONLINE] Error creando sala:", err)
     alert("Error creando sala")
+    return false
   }
 }
 
-// ===== UNIRSE A SALA (GUEST) =====
-async function joinRoom(codigo) {
-  if (!db) {
-    alert("Firebase no conectado")
-    return false
-  }
-
-  codigo = codigo.toUpperCase().trim()
+// ===============================
+// Unirse a sala (GUEST)
+// ===============================
+async function joinRoom(code) {
+  const codigo = code.toUpperCase().trim()
   console.log("[ONLINE] GUEST intentando unirse a:", codigo)
 
   try {
-    const snap = await db.ref(`rooms/${codigo}`).once("value")
+    const ref = db.ref(`rooms/${codigo}`)
+    const snap = await ref.once("value")
 
+    // Verificar que la sala existe
     if (!snap.exists()) {
-      console.log("[ONLINE] Sala no existe:", codigo)
+      console.log("[ONLINE] Sala NO existe:", codigo)
       alert("Sala '" + codigo + "' no existe. Verifica el codigo.")
       return false
     }
 
     const room = snap.val()
+    const players = room.players || {}
+    const playerCount = Object.keys(players).length
 
-    if (room.status !== "waiting") {
-      alert("Esta sala ya tiene partida en curso")
-      return false
-    }
-
-    const playerCount = room.players ? Object.keys(room.players).length : 0
+    // Verificar que no este llena
     if (playerCount >= 2) {
-      alert("Sala llena")
+      console.log("[ONLINE] Sala llena:", codigo)
+      alert("Sala llena - ya hay 2 jugadores")
       return false
     }
 
-    const statusRef = db.ref(`rooms/${codigo}/status`)
-    const result = await statusRef.transaction((current) => {
-      if (current === "waiting") return "ready"
-      return undefined // Abortar
-    })
-
-    if (!result.committed) {
-      alert("Otro jugador se unio primero")
+    // Verificar status
+    if (room.status !== "waiting") {
+      console.log("[ONLINE] Sala no esta esperando:", room.status)
+      alert("Esta sala ya tiene partida en curso")
       return false
     }
 
     // Unirse exitosamente
     roomId = codigo
     isHost = false
-    onlineReady = true
+    onlineReady = false
+    gameStarted = false
 
     await db.ref(`rooms/${roomId}/players/${playerId}`).set({
       speed: 0,
       distance: 0,
     })
 
-    console.log("[ONLINE] GUEST unido exitosamente")
+    // Actualizar status a ready
+    await db.ref(`rooms/${roomId}/status`).set("ready")
 
-    // Actualizar UI
-    document.getElementById("salaConectada").textContent = roomId
-    document.getElementById("unirseSalaView")?.classList.add("hidden")
-    document.getElementById("conectadoView")?.classList.remove("hidden")
-    document.getElementById("p1StatusOnline").textContent = "Host"
-    document.getElementById("p2StatusOnline").textContent = "Tu (Guest)"
-
-    const btnIniciar = document.getElementById("btnIniciarOnline")
-    if (btnIniciar) {
-      btnIniciar.textContent = "Esperando que Host inicie..."
-      btnIniciar.disabled = true
-      btnIniciar.classList.add("opacity-50", "cursor-not-allowed")
-    }
+    console.log("[ONLINE] GUEST unido exitosamente a sala:", roomId)
 
     listenRoom()
     return true
-  } catch (error) {
-    console.error("[ONLINE] Error uniendose:", error)
-    alert("Error al unirse")
+  } catch (err) {
+    console.error("[ONLINE] Error uniendose:", err)
+    alert("Error al unirse a la sala")
     return false
   }
 }
 
-// ===== ESCUCHAR SALA =====
+// ===============================
+// Escuchar sala completa
+// ===============================
 function listenRoom() {
-  if (!roomId || !db) return
-
   console.log("[ONLINE] Escuchando sala:", roomId)
 
   db.ref(`rooms/${roomId}`).on("value", (snap) => {
@@ -162,57 +138,79 @@ function listenRoom() {
 
     const room = snap.val()
     const players = room.players || {}
-    const playerCount = Object.keys(players).length
+    const ids = Object.keys(players)
+    const playerCount = ids.length
 
-    // HOST: detectar cuando se une el guest
-    if (isHost && playerCount === 2 && !onlineReady) {
+    // Detectar cuando hay 2 jugadores
+    if (playerCount === 2 && !onlineReady) {
       onlineReady = true
-      console.log("[ONLINE] HOST: Rival conectado!")
+      console.log("[ONLINE] 2 jugadores conectados!")
 
-      document.getElementById("crearSalaView")?.classList.add("hidden")
-      document.getElementById("conectadoView")?.classList.remove("hidden")
-      document.getElementById("salaConectada").textContent = roomId
-      document.getElementById("p1StatusOnline").textContent = "Tu (Host)"
-      document.getElementById("p2StatusOnline").textContent = "Guest conectado"
+      if (isHost) {
+        // HOST: mostrar vista conectado y habilitar boton
+        document.getElementById("crearSalaView")?.classList.add("hidden")
+        document.getElementById("conectadoView")?.classList.remove("hidden")
+        document.getElementById("salaConectada").textContent = roomId
+        document.getElementById("p1StatusOnline").textContent = "Tu (Host)"
+        document.getElementById("p2StatusOnline").textContent = "Guest conectado"
 
-      const btnIniciar = document.getElementById("btnIniciarOnline")
-      if (btnIniciar) {
-        btnIniciar.textContent = "Iniciar Carrera"
-        btnIniciar.disabled = false
-        btnIniciar.classList.remove("opacity-50", "cursor-not-allowed")
+        const btnIniciar = document.getElementById("btnIniciarOnline")
+        if (btnIniciar) {
+          btnIniciar.textContent = "Iniciar Carrera"
+          btnIniciar.disabled = false
+          btnIniciar.classList.remove("opacity-50", "cursor-not-allowed")
+        }
+      } else {
+        // GUEST: deshabilitar boton, esperar que host inicie
+        document.getElementById("p1StatusOnline").textContent = "Host"
+        document.getElementById("p2StatusOnline").textContent = "Tu (Guest)"
+
+        const btnIniciar = document.getElementById("btnIniciarOnline")
+        if (btnIniciar) {
+          btnIniciar.textContent = "Esperando que Host inicie..."
+          btnIniciar.disabled = true
+          btnIniciar.classList.add("opacity-50", "cursor-not-allowed")
+        }
+      }
+    }
+
+    // GUEST: detectar cuando HOST inicia el juego
+    if (!isHost && room.gameStarted && room.startTime && !gameStarted) {
+      gameStarted = true
+      startTime = room.startTime
+      console.log("[ONLINE] GUEST: Host inicio el juego, startTime:", startTime)
+
+      // Iniciar carrera con el tiempo del host
+      if (typeof window.startOnlineRace === "function") {
+        window.startOnlineRace(startTime)
       }
     }
 
     // Actualizar estado del enemigo
-    for (const id in players) {
+    ids.forEach((id) => {
       if (id !== playerId) {
         enemyState = players[id]
-        window.updateEnemyDisplay?.(enemyState)
+        if (typeof window.updateEnemyDisplay === "function") {
+          window.updateEnemyDisplay(enemyState)
+        }
       }
-    }
-
-    if (!isHost && room.gameStarted && room.startTime && !gameStarted) {
-      gameStarted = true
-      startTime = room.startTime
-      console.log("[ONLINE] GUEST: Juego iniciado por HOST, startTime:", startTime)
-
-      // Llamar al callback del game.js con el startTime
-      window.startOnlineRace?.(startTime)
-    }
+    })
   })
 }
 
-// ===== HOST INICIA JUEGO =====
+// ===============================
+// HOST inicia el juego
+// ===============================
 function hostStartGame() {
   if (!isHost || !roomId || !onlineReady) {
-    console.log("[ONLINE] No se puede iniciar:", { isHost, roomId, onlineReady })
+    console.log("[ONLINE] No puede iniciar:", { isHost, roomId, onlineReady })
     return null
   }
 
   startTime = Date.now()
   gameStarted = true
 
-  console.log("[ONLINE] HOST iniciando juego con startTime:", startTime)
+  console.log("[ONLINE] HOST iniciando juego, startTime:", startTime)
 
   db.ref(`rooms/${roomId}`).update({
     gameStarted: true,
@@ -222,17 +220,22 @@ function hostStartGame() {
   return startTime
 }
 
-// ===== ENVIAR ESTADO =====
+// ===============================
+// Enviar estado del jugador
+// ===============================
 function sendOnlineState(speed, distance) {
-  if (!roomId || !db) return
+  if (!roomId || !onlineReady) return
 
   db.ref(`rooms/${roomId}/players/${playerId}`).update({
-    speed: speed || 0,
-    distance: distance || 0,
+    speed,
+    distance,
+    t: Date.now(),
   })
 }
 
-// ===== GETTERS =====
+// ===============================
+// Getters
+// ===============================
 function isOnlineGameReady() {
   return onlineReady
 }
@@ -245,28 +248,28 @@ function getRoomId() {
 function getStartTime() {
   return startTime
 }
-function getEnemyState() {
-  return enemyState
-}
 
-// ===== CLEANUP =====
+// ===============================
+// Cleanup
+// ===============================
 function cleanupOnlineGame() {
-  if (roomId && db) {
-    db.ref(`rooms/${roomId}/players/${playerId}`).remove()
-    if (isHost) {
-      db.ref(`rooms/${roomId}`).remove()
-    }
-  }
+  if (!roomId) return
+
+  db.ref(`rooms/${roomId}/players/${playerId}`).remove()
+  if (isHost) db.ref(`rooms/${roomId}`).remove()
+
   roomId = null
-  isHost = false
   onlineReady = false
+  isHost = false
   gameStarted = false
   startTime = null
 }
 
 window.addEventListener("beforeunload", cleanupOnlineGame)
 
-// ===== EXPONER GLOBALMENTE =====
+// ===============================
+// Exponer API
+// ===============================
 window.createRoom = createRoom
 window.joinRoom = joinRoom
 window.hostStartGame = hostStartGame
@@ -277,4 +280,4 @@ window.getRoomId = getRoomId
 window.getStartTime = getStartTime
 window.cleanupOnlineGame = cleanupOnlineGame
 
-console.log("[ONLINE] Modulo V16 HOST AUTHORITY listo!")
+console.log("[ONLINE] Modulo online V16 FINAL FIXED cargado")
