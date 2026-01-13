@@ -1,125 +1,137 @@
-// ===== ONLINE.JS – V16 FINAL FIX =====
-console.log("[ONLINE] Cargando modulo online V16 FINAL FIX")
+console.log("[ONLINE] Cargando modulo online V16 FIX")
 
-// Firebase init (frontend)
-firebase.initializeApp({
-  databaseURL: "https://bicigame-a06d7-default-rtdb.firebaseio.com",
-})
+// ===== Firebase config (YA EXISTENTE EN TU PROYECTO) =====
+// firebase.initializeApp(firebaseConfig)
 
 const db = firebase.database()
 
-// ===== ESTADO (DECLARADO ARRIBA → SIN TDZ) =====
+// ===== Estado =====
 let roomId = null
 let playerId = "p" + Math.floor(Math.random() * 100000)
 let isHost = false
-let onlineReady = false
-let enemyState = { speed: 0, distance: 0 }
+let gameStarted = false
 
 console.log("[ONLINE] Player ID:", playerId)
 
-// ===== CREAR SALA =====
-async function createRoom() {
-  isHost = true
-  onlineReady = false
+// ===== Utils =====
+function isGameHost() {
+  return isHost === true
+}
 
+// ===== Crear sala =====
+function createRoom() {
   roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
+  isHost = true
 
-  await db.ref(`rooms/${roomId}`).set({
+  db.ref(`rooms/${roomId}`).set({
+    state: "waiting",
     host: playerId,
-    gameStarted: false,
     players: {
-      [playerId]: { speed: 0, distance: 0 },
+      [playerId]: {
+        clicks: 0,
+        distance: 0,
+        speed: 0,
+      },
     },
   })
 
-  const el = document.getElementById("codigoSala")
-  if (el) el.textContent = roomId
+  document.getElementById("codigoSala").textContent = roomId
+  document.getElementById("salaConectada").textContent = roomId
 
-  listenRoom()
+  showCrearSala()
+  listenRoomState()
+  listenPlayers()
 }
 
-// ===== UNIRSE =====
-async function joinRoom(code) {
+// ===== Unirse a sala =====
+function joinRoom(code) {
   roomId = code.toUpperCase()
   isHost = false
 
-  const snap = await db.ref(`rooms/${roomId}`).once("value")
-  if (!snap.exists()) {
-    alert("Sala no existe")
-    roomId = null
-    return
-  }
-
-  const players = snap.val().players || {}
-  if (Object.keys(players).length >= 2) {
-    alert("Sala llena")
-    roomId = null
-    return
-  }
-
-  await db.ref(`rooms/${roomId}/players/${playerId}`).set({
-    speed: 0,
-    distance: 0,
-  })
-
-  listenRoom()
-}
-
-// ===== ESCUCHAR SALA =====
-function listenRoom() {
-  db.ref(`rooms/${roomId}`).on("value", snap => {
-    if (!snap.exists()) return
-
-    const room = snap.val()
-    const players = room.players || {}
-    onlineReady = Object.keys(players).length === 2
-
-    // 🔹 SOLO HOST puede iniciar
-    if (room.gameStarted && typeof window.startOnlineRace === "function") {
-      window.startOnlineRace()
+  db.ref(`rooms/${roomId}`).once("value").then((snap) => {
+    if (!snap.exists()) {
+      alert("Sala no existe")
+      return
     }
 
-    // 🔹 Enemigo
-    for (const id in players) {
-      if (id !== playerId) {
-        enemyState = players[id]
-        window.updateEnemyDisplay?.(enemyState)
+    db.ref(`rooms/${roomId}/players/${playerId}`).set({
+      clicks: 0,
+      distance: 0,
+      speed: 0,
+    })
+
+    document.getElementById("salaConectada").textContent = roomId
+
+    showConectado()
+    listenRoomState()
+    listenPlayers()
+  })
+}
+
+// ===== UI =====
+function showCrearSala() {
+  document.getElementById("opcionesView").classList.add("hidden")
+  document.getElementById("crearSalaView").classList.remove("hidden")
+}
+
+function showConectado() {
+  document.getElementById("opcionesView").classList.add("hidden")
+  document.getElementById("crearSalaView").classList.add("hidden")
+  document.getElementById("unirseSalaView").classList.add("hidden")
+  document.getElementById("conectadoView").classList.remove("hidden")
+
+  const btn = document.getElementById("btnIniciarOnline")
+  if (isHost) {
+    btn.style.display = "block"
+    btn.disabled = false
+  } else {
+    btn.style.display = "none"
+  }
+}
+
+// ===== Iniciar carrera (SOLO HOST) =====
+function startOnlineGame() {
+  if (!isHost) return
+
+  db.ref(`rooms/${roomId}`).update({
+    state: "playing",
+    startTime: firebase.database.ServerValue.TIMESTAMP,
+  })
+}
+
+// ===== Escuchar estado de sala =====
+function listenRoomState() {
+  db.ref(`rooms/${roomId}/state`).on("value", (snap) => {
+    if (snap.val() === "playing" && !gameStarted) {
+      gameStarted = true
+      if (window.startGame) {
+        window.startGame("online")
       }
     }
   })
 }
 
-// ===== ENVIAR ESTADO =====
-function sendOnlineState(speed, distance) {
-  if (!roomId || !onlineReady) return
+// ===== Escuchar jugadores =====
+function listenPlayers() {
+  db.ref(`rooms/${roomId}/players`).on("value", (snap) => {
+    if (!snap.exists()) return
 
-  db.ref(`rooms/${roomId}/players/${playerId}`).update({
-    speed,
-    distance,
+    const players = snap.val()
+
+    for (const id in players) {
+      if (id !== playerId) {
+        if (window.updateEnemyDisplay) {
+          window.updateEnemyDisplay(players[id])
+        }
+      }
+    }
   })
 }
 
-// ===== HOST INICIA =====
-function hostStartGame() {
-  if (!roomId || !isHost) return
-  db.ref(`rooms/${roomId}/gameStarted`).set(true)
-}
-
-// ===== CLEANUP =====
-function cleanupOnlineGame() {
-  if (!roomId) return
-  db.ref(`rooms/${roomId}/players/${playerId}`).remove()
-  if (isHost) db.ref(`rooms/${roomId}`).remove()
-  roomId = null
-}
-
-// ===== EXPONER =====
+// ===== Exponer =====
 window.createRoom = createRoom
 window.joinRoom = joinRoom
-window.sendOnlineState = sendOnlineState
-window.hostStartGame = hostStartGame
-window.cleanupOnlineGame = cleanupOnlineGame
-window.isGameHost = () => isHost
-window.isOnlineGameReady = () => onlineReady
+window.startOnlineGame = startOnlineGame
+window.isGameHost = isGameHost
 
-console.log("[ONLINE] Modulo online V16 FINAL FIX listo")
+console.log("[ONLINE] Modulo online V16 FIX listo")
