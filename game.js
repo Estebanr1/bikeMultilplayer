@@ -1,111 +1,78 @@
-console.log("[GAME] Cargando V16 ONLINE SYNC")
+// ===== GAME.JS V16 CLEAN =====
+console.log("[GAME] Cargando V16 CLEAN")
 
+let mode = null
 let gameRunning = false
-let startTime = 0
-let distance = 0
-let speed = 0
 
-function startGame(mode) {
-  gameRunning = true
-  distance = 0
-  speed = 0
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("[GAME] DOM READY")
 
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"))
-  document.getElementById("juegoCarrera").classList.add("active")
+  const btnCrear = document.getElementById("btnCrearSala")
+  const btnUnirse = document.getElementById("btnConectarSala")
+  const btnIniciar = document.getElementById("btnIniciarOnline")
 
-  firebase.database().ref(`rooms/${roomId}/startTime`).once("value").then(snap => {
-    startTime = snap.val() || Date.now()
-    runTimer()
-  })
-}
+  btnCrear.onclick = async () => {
+    const code = await window.createRoom()
+    document.getElementById("codigoSala").textContent = code
+    document.getElementById("crearSalaView").classList.remove("hidden")
+    document.getElementById("opcionesView").classList.add("hidden")
+  }
 
-function runTimer() {
-  const el = document.getElementById("tiempoRestante")
-
-  const i = setInterval(() => {
-    if (!gameRunning) {
-      clearInterval(i)
+  btnUnirse.onclick = async () => {
+    const code = document.getElementById("inputCodigoSala").value
+    const ok = await window.joinRoom(code)
+    if (!ok) {
+      alert("No se pudo unir")
       return
     }
+    document.getElementById("salaConectada").textContent = code
+    document.getElementById("unirseSalaView").classList.add("hidden")
+    document.getElementById("conectadoView").classList.remove("hidden")
+    btnIniciar.style.display = "none"
+  }
 
-    const t = Math.floor((Date.now() - startTime) / 1000)
-    const r = Math.max(0, 60 - t)
-    el.textContent = r
+  btnIniciar.onclick = () => {
+    if (!window.isGameHost()) return
+    window.hostStartGame()
+  }
+})
 
-    if (r <= 0) {
-      gameRunning = false
-    }
-  }, 200)
+// ===== Eventos desde online.js =====
+window.onOnlineReady = (isHost) => {
+  document.getElementById("conectadoView").classList.remove("hidden")
+  document.getElementById("btnIniciarOnline").style.display = isHost
+    ? "block"
+    : "none"
 }
 
-function handleClick() {
+window.onOnlineGameStart = () => {
+  startGame()
+}
+
+// ===== Juego =====
+function startGame() {
+  if (gameRunning) return
+  gameRunning = true
+  console.log("[GAME] Carrera iniciada")
+
+  document.getElementById("paginaOnline").classList.remove("active")
+  document.getElementById("juegoCarrera").classList.add("active")
+}
+
+// ===== Loop ejemplo =====
+function gameLoop() {
   if (!gameRunning) return
 
-  distance += 5
-  speed = 20
+  // ejemplo de datos
+  const speed = Math.random() * 30
+  const distance = Math.random() * 100
 
-  document.getElementById("p1Dist").textContent = distance + "m"
-  document.getElementById("p1Speed").textContent = speed + " km/h"
+  window.sendOnlineState(speed, distance)
 
-  firebase.database().ref(`rooms/${roomId}/players/${playerId}`).update({
-    distance,
-    speed,
-  })
+  const enemy = window.getEnemyState()
+  // acá tu render existente
 }
 
-window.updateEnemyDisplay = (e) => {
-  document.getElementById("p2Dist").textContent = e.distance + "m"
-  document.getElementById("p2Speed").textContent = e.speed + " km/h"
-}
+setInterval(gameLoop, 100)
 
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("btnP1Click").onclick = handleClick
-  document.getElementById("btnIniciarOnline").onclick = () => {
-    if (window.startOnlineGame) window.startOnlineGame()
-  }
-})
-
-window.startGame = startGame
-
-console.log("[GAME] V16 ONLINE SYNC cargado")
-// ===== UI FIX V16 =====
-document.addEventListener("DOMContentLoaded", () => {
-
-  const show = (id) => {
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"))
-    document.getElementById(id)?.classList.add("active")
-  }
-
-  // Inicio
-  document.getElementById("btnOnline")?.onclick = () => show("paginaOnline")
-  document.getElementById("volverDesdeOnline")?.onclick = () => show("inicio")
-
-  // Online flow
-  document.getElementById("btnCrearSala")?.onclick = () => {
-    document.getElementById("opcionesView").classList.add("hidden")
-    document.getElementById("crearSalaView").classList.remove("hidden")
-    window.createRoom()
-  }
-
-  document.getElementById("btnUnirseSala")?.onclick = () => {
-    document.getElementById("opcionesView").classList.add("hidden")
-    document.getElementById("unirseSalaView").classList.remove("hidden")
-  }
-
-  document.getElementById("btnConectarSala")?.onclick = () => {
-    const code = document.getElementById("inputCodigoSala").value.trim()
-    if (code.length === 4) window.joinRoom(code)
-  }
-
-  document.getElementById("btnCancelarCrear")?.onclick = () => {
-    document.getElementById("crearSalaView").classList.add("hidden")
-    document.getElementById("opcionesView").classList.remove("hidden")
-  }
-
-  document.getElementById("btnCancelarUnirse")?.onclick = () => {
-    document.getElementById("unirseSalaView").classList.add("hidden")
-    document.getElementById("opcionesView").classList.remove("hidden")
-  }
-
-})
-
+console.log("[GAME] V16 CLEAN listo")
