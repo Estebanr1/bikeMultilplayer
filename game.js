@@ -1,22 +1,30 @@
-// ===== GAME.JS - V16 HOST AUTHORITY (TIEMPO SINCRONIZADO) =====
-console.log("[GAME] Cargando V16 HOST AUTHORITY...")
+// ===== GAME.JS - V16 COMPLETE =====
+console.log("[GAME] Cargando V16 COMPLETE...")
+
+function isOnlineHost() {
+  return window.isGameHost?.()
+}
 
 // Estado del juego
 const gameState = {
+  // Conexion sensor
   isConnected: false,
   connectionMethod: null,
   serialPort: null,
   writer: null,
+
+  // Juego
   gameActive: false,
   gameMode: null,
-  animationFrameId: null,
+  gameTimer: null,
+  timeLeft: 60,
   raceDistance: 1000,
-  gameDuration: 60,
 
-  startTime: null,
-
+  // Jugadores
   player1: { velocidad: 0, distancia: 0, clickCount: 0, position: 0 },
   player2: { velocidad: 0, distancia: 0, clickCount: 0, position: 0 },
+
+  // Sensor
   totalClicks: 0,
   lastInputTime: 0,
 }
@@ -74,6 +82,7 @@ async function connectSensor() {
     document.getElementById("detectarNodeMCU").textContent = "Sensor Conectado"
     document.getElementById("detectarNodeMCU").disabled = true
 
+    // Leer datos
     startReading(port)
   } catch (error) {
     console.error("[GAME] Error sensor:", error)
@@ -128,6 +137,7 @@ function handleSensorClick() {
   gameState.totalClicks++
   updateClickDisplay()
 
+  // LED visual
   const led = document.getElementById("ledDot")
   if (led) {
     led.className = "w-4 h-4 rounded-full mx-auto mb-1 bg-green-500"
@@ -149,15 +159,30 @@ function updateClickDisplay() {
 function handlePlayerInput(playerNum) {
   if (!gameState.gameActive) return
 
-  const player = playerNum === 1 ? gameState.player1 : gameState.player2
+  const isHost = isOnlineHost()
+
+// En online:
+// Host controla player1
+// Guest controla player2
+const player =
+  gameState.gameMode === "online"
+    ? isHost
+      ? gameState.player1
+      : gameState.player2
+    : playerNum === 1
+    ? gameState.player1
+    : gameState.player2
+
   const now = Date.now()
   const timeDiff = now - gameState.lastInputTime
 
+  // Calcular velocidad
   if (timeDiff < 200) player.velocidad = 45
   else if (timeDiff < 500) player.velocidad = 35
   else if (timeDiff < 1000) player.velocidad = 25
   else player.velocidad = 15
 
+  // Avanzar
   const increment = 3 + player.velocidad / 8
   player.distancia = Math.min(gameState.raceDistance, player.distancia + increment)
   player.position = (player.distancia / gameState.raceDistance) * 100
@@ -165,105 +190,83 @@ function handlePlayerInput(playerNum) {
 
   gameState.lastInputTime = now
 
+  // Animacion bici
   const bike = document.getElementById(`bike${playerNum}`)
   if (bike) {
     bike.parentElement.parentElement.classList.add("bike-racing")
     setTimeout(() => bike.parentElement.parentElement.classList.remove("bike-racing"), 300)
   }
 
-  // Enviar estado online
+  // Enviar online si aplica
   if (typeof window.sendOnlineState === "function" && window.isOnlineGameReady?.()) {
     window.sendOnlineState(player.velocidad, player.distancia)
   }
 
   updateDisplay()
 
+  // Verificar victoria
   if (player.distancia >= gameState.raceDistance) {
     endGame(playerNum)
   }
 }
 
-// Recibir datos del enemigo online
+// Para recibir datos del enemigo online
 window.updateEnemyDisplay = (enemyState) => {
-  if (!gameState.gameActive) return
+  if (!gameState.gameActive || gameState.gameMode !== "online") return
 
-  gameState.player2.distancia = enemyState.distance || 0
-  gameState.player2.velocidad = enemyState.speed || 0
-  gameState.player2.position = (gameState.player2.distancia / gameState.raceDistance) * 100
+  const isHost = isOnlineHost()
+  const enemyPlayer = isHost ? gameState.player2 : gameState.player1
+
+  enemyPlayer.distancia = enemyState.distance || 0
+  enemyPlayer.velocidad = enemyState.speed || 0
+  enemyPlayer.position =
+    (enemyPlayer.distancia / gameState.raceDistance) * 100
 
   updateDisplay()
 
-  if (gameState.player2.distancia >= gameState.raceDistance) {
-    endGame(2)
+  if (enemyPlayer.distancia >= gameState.raceDistance) {
+    endGame(isHost ? 2 : 1)
   }
 }
+
 
 function updateDisplay() {
   const p1 = gameState.player1
   const p2 = gameState.player2
 
+  // Posiciones visuales
   const p1Container = document.getElementById("player1Container")
   const p2Container = document.getElementById("player2Container")
 
   if (p1Container) p1Container.style.bottom = `${5 + p1.position * 0.85}%`
   if (p2Container) p2Container.style.bottom = `${5 + p2.position * 0.85}%`
 
+  // Stats
   document.getElementById("p1Speed").textContent = `${Math.round(p1.velocidad)} km/h`
   document.getElementById("p1Dist").textContent = `${Math.round(p1.distancia)}m`
   document.getElementById("p2Speed").textContent = `${Math.round(p2.velocidad)} km/h`
   document.getElementById("p2Dist").textContent = `${Math.round(p2.distancia)}m`
 
+  // Progress bars
   document.getElementById("p1Percent").textContent = `${Math.round(p1.position)}%`
   document.getElementById("p1ProgressFill").style.width = `${p1.position}%`
   document.getElementById("p2Percent").textContent = `${Math.round(p2.position)}%`
   document.getElementById("p2ProgressFill").style.width = `${p2.position}%`
 }
 
-function getElapsedSeconds() {
-  if (!gameState.startTime) return 0
-  return Math.floor((Date.now() - gameState.startTime) / 1000)
-}
-
-function getTimeLeft() {
-  return Math.max(0, gameState.gameDuration - getElapsedSeconds())
-}
-
-function gameLoop() {
-  if (!gameState.gameActive) return
-
-  const timeLeft = getTimeLeft()
-  document.getElementById("tiempoRestante").textContent = timeLeft
-
-  // Decay velocidad
-  gameState.player1.velocidad *= 0.995
-  gameState.player2.velocidad *= 0.995
-  updateDisplay()
-
-  if (timeLeft <= 0) {
-    endGame(null)
-    return
-  }
-
-  gameState.animationFrameId = requestAnimationFrame(gameLoop)
-}
-
-function startGame(mode, syncStartTime = null) {
-  console.log("[GAME] Iniciando modo:", mode, "startTime:", syncStartTime)
+function startGame(mode) {
+  console.log("[GAME] Iniciando modo:", mode)
 
   gameState.gameActive = true
   gameState.gameMode = mode
+  gameState.timeLeft = 60
   gameState.player1 = { velocidad: 0, distancia: 0, clickCount: 0, position: 0 }
   gameState.player2 = { velocidad: 0, distancia: 0, clickCount: 0, position: 0 }
   gameState.lastInputTime = Date.now()
 
-  if (syncStartTime) {
-    gameState.startTime = syncStartTime
-  } else {
-    gameState.startTime = Date.now()
-  }
-
   showPage("juegoCarrera")
 
+  // Configurar UI segun modo
   const lane2 = document.getElementById("lane2")
   const progressP2 = document.getElementById("progressP2")
   const btnP2 = document.getElementById("btnP2Click")
@@ -280,24 +283,42 @@ function startGame(mode, syncStartTime = null) {
     document.getElementById("modoDisplay").textContent = "Individual"
   }
 
-  if (gameState.animationFrameId) {
-    cancelAnimationFrame(gameState.animationFrameId)
-  }
-  gameState.animationFrameId = requestAnimationFrame(gameLoop)
+  // Timer
+  gameState.gameTimer = setInterval(() => {
+    gameState.timeLeft--
+    document.getElementById("tiempoRestante").textContent = gameState.timeLeft
+
+    if (gameState.timeLeft <= 0) {
+      endGame(null)
+    }
+  }, 1000)
+
+  // Decay velocidad
+  setInterval(() => {
+    if (gameState.gameActive) {
+      gameState.player1.velocidad *= 0.95
+      gameState.player2.velocidad *= 0.95
+      updateDisplay()
+    }
+  }, 500)
 }
 
-window.startOnlineRace = (syncStartTime) => {
-  console.log("[GAME] startOnlineRace llamado con startTime:", syncStartTime)
-  startGame("online", syncStartTime)
+// Funcion para que online.js inicie el juego
+window.startOnlineRace = () => {
+  startGame("online")
 }
+window.onOnlineReady = () => {
+  if (window.isGameHost?.()) {
+    console.log("[GAME] Host detecta rival, inicia carrera")
+    window.hostStartGame?.()
+    startGame("online")
+  }
+}
+
 
 function endGame(winner) {
   gameState.gameActive = false
-
-  if (gameState.animationFrameId) {
-    cancelAnimationFrame(gameState.animationFrameId)
-    gameState.animationFrameId = null
-  }
+  if (gameState.gameTimer) clearInterval(gameState.gameTimer)
 
   setTimeout(() => {
     showPage("resultados")
@@ -319,19 +340,19 @@ function showResults(winner) {
   document.getElementById("winnerText").textContent = winnerText
 
   document.getElementById("resultsTable").innerHTML = `
-    <div class="grid grid-cols-2 gap-4">
-      <div class="bg-blue-100 p-4 rounded-lg text-center">
-        <div class="font-bold text-blue-600">Jugador 1</div>
-        <div class="text-2xl font-bold">${Math.round(p1.distancia)}m</div>
-        <div class="text-sm text-gray-600">${p1.clickCount} clicks</div>
-      </div>
-      <div class="bg-red-100 p-4 rounded-lg text-center">
-        <div class="font-bold text-red-600">Jugador 2</div>
-        <div class="text-2xl font-bold">${Math.round(p2.distancia)}m</div>
-        <div class="text-sm text-gray-600">${p2.clickCount} clicks</div>
-      </div>
-    </div>
-  `
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-blue-100 p-4 rounded-lg text-center">
+                <div class="font-bold text-blue-600">Jugador 1</div>
+                <div class="text-2xl font-bold">${Math.round(p1.distancia)}m</div>
+                <div class="text-sm text-gray-600">${p1.clickCount} clicks</div>
+            </div>
+            <div class="bg-red-100 p-4 rounded-lg text-center">
+                <div class="font-bold text-red-600">Jugador 2</div>
+                <div class="text-2xl font-bold">${Math.round(p2.distancia)}m</div>
+                <div class="text-sm text-gray-600">${p2.clickCount} clicks</div>
+            </div>
+        </div>
+    `
 }
 
 // ===== EVENT LISTENERS =====
@@ -339,8 +360,10 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("[GAME] DOM ready")
   checkSerialSupport()
 
+  // Sensor
   document.getElementById("detectarNodeMCU")?.addEventListener("click", connectSensor)
 
+  // Navegacion
   document.getElementById("btnLocal")?.addEventListener("click", () => showPage("seleccionModo"))
   document.getElementById("btnOnline")?.addEventListener("click", () => showPage("paginaOnline"))
   document.getElementById("volverInicio")?.addEventListener("click", () => showPage("inicio"))
@@ -353,6 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showPage("inicio")
   })
 
+  // Modos locales
   document.querySelectorAll(".mode-btn").forEach((btn) => {
     btn.addEventListener("click", function () {
       startGame(this.dataset.mode)
@@ -360,15 +384,15 @@ document.addEventListener("DOMContentLoaded", () => {
   })
 
   document.getElementById("btnCrearSala")?.addEventListener("click", () => {
+    
+    document.getElementById("opcionesView")?.classList.add("hidden")
+    document.getElementById("crearSalaView")?.classList.remove("hidden")
+
+    // Iniciar sala en Firebase si está disponible
     if (typeof window.createRoom === "function") {
-      window.createRoom()
-    } else {
-      // Fallback demo
-      const codigo = Math.random().toString(36).substring(2, 6).toUpperCase()
-      document.getElementById("codigoSala").textContent = codigo
-      document.getElementById("opcionesView")?.classList.add("hidden")
-      document.getElementById("crearSalaView")?.classList.remove("hidden")
-    }
+  window.createRoom()
+}
+
   })
 
   document.getElementById("btnUnirseSala")?.addEventListener("click", () => {
@@ -376,21 +400,20 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("unirseSalaView")?.classList.remove("hidden")
   })
 
-  document.getElementById("btnConectarSala")?.addEventListener("click", async () => {
-    const codigo = document.getElementById("inputCodigoSala")?.value.toUpperCase().trim()
-    if (!codigo || codigo.length < 4) {
-      alert("Ingresa un codigo de 4 caracteres")
-      return
-    }
-
-    if (typeof window.joinRoom === "function") {
-      const success = await window.joinRoom(codigo)
-      // UI se actualiza dentro de joinRoom si es exitoso
-    } else {
-      // Fallback demo
+  document.getElementById("btnConectarSala")?.addEventListener("click", () => {
+    const codigo = document.getElementById("inputCodigoSala")?.value.toUpperCase()
+    if (codigo && codigo.length >= 4) {
       document.getElementById("salaConectada").textContent = codigo
       document.getElementById("unirseSalaView")?.classList.add("hidden")
       document.getElementById("conectadoView")?.classList.remove("hidden")
+
+      // Unirse a sala en Firebase si está disponible
+      if (typeof window.joinRoom === "function") {
+  window.joinRoom(codigo)
+}
+
+    } else {
+      alert("Ingresa un código de 4 caracteres")
     }
   })
 
@@ -400,7 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("crearSalaView")?.classList.add("hidden")
     document.getElementById("conectadoView")?.classList.remove("hidden")
     document.getElementById("p1StatusOnline").textContent = "Tu (Host)"
-    document.getElementById("p2StatusOnline").textContent = "Conectado (Demo)"
+    document.getElementById("p2StatusOnline").textContent = "Conectado"
   })
 
   document.getElementById("btnCancelarCrear")?.addEventListener("click", () => {
@@ -417,19 +440,16 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btnIniciarOnline")?.addEventListener("click", () => {
     if (window.isOnlineGameReady?.()) {
       if (window.isGameHost?.()) {
-        // HOST: obtiene startTime y arranca
-        const syncStartTime = window.hostStartGame?.()
-        if (syncStartTime) {
-          startGame("online", syncStartTime)
-        }
+        window.hostStartGame?.()
       }
-      // GUEST: NO hace nada aqui, espera el callback startOnlineRace
+      startGame("online")
     } else {
-      // Demo mode sin conexion real
+      // Demo mode - iniciar sin conexión real
       startGame("online")
     }
   })
 
+  // Controles de juego
   document.getElementById("btnP1Click")?.addEventListener("click", () => {
     if (gameState.gameActive) handlePlayerInput(1)
   })
@@ -438,16 +458,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gameState.gameActive && gameState.gameMode === "multi") handlePlayerInput(2)
   })
 
+  // Teclado
   document.addEventListener("keydown", (e) => {
     if (!gameState.gameActive) return
+
     if (e.code === "Space" && gameState.gameMode === "multi") {
       e.preventDefault()
       handlePlayerInput(2)
     }
   })
 
+  // Resultados
   document.getElementById("btnPlayAgain")?.addEventListener("click", () => {
-    window.cleanupOnlineGame?.()
     if (gameState.gameMode === "online") {
       showPage("paginaOnline")
       document.getElementById("opcionesView")?.classList.remove("hidden")
@@ -465,4 +487,4 @@ document.addEventListener("DOMContentLoaded", () => {
   })
 })
 
-console.log("[GAME] V16 HOST AUTHORITY cargado!")
+console.log("[GAME] V16 COMPLETE cargado!")
