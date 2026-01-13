@@ -68,3 +68,44 @@ document.addEventListener("DOMContentLoaded", () => {
 window.startGame = startGame
 
 console.log("[GAME] V16 ONLINE SYNC cargado")
+// ===== UI FIX V16 =====
+document.addEventListener("DOMContentLoaded", () => {
+
+  const show = (id) => {
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"))
+    document.getElementById(id)?.classList.add("active")
+  }
+
+  // Inicio
+  document.getElementById("btnOnline")?.onclick = () => show("paginaOnline")
+  document.getElementById("volverDesdeOnline")?.onclick = () => show("inicio")
+
+  // Online flow
+  document.getElementById("btnCrearSala")?.onclick = () => {
+    document.getElementById("opcionesView").classList.add("hidden")
+    document.getElementById("crearSalaView").classList.remove("hidden")
+    window.createRoom()
+  }
+
+  document.getElementById("btnUnirseSala")?.onclick = () => {
+    document.getElementById("opcionesView").classList.add("hidden")
+    document.getElementById("unirseSalaView").classList.remove("hidden")
+  }
+
+  document.getElementById("btnConectarSala")?.onclick = () => {
+    const code = document.getElementById("inputCodigoSala").value.trim()
+    if (code.length === 4) window.joinRoom(code)
+  }
+
+  document.getElementById("btnCancelarCrear")?.onclick = () => {
+    document.getElementById("crearSalaView").classList.add("hidden")
+    document.getElementById("opcionesView").classList.remove("hidden")
+  }
+
+  document.getElementById("btnCancelarUnirse")?.onclick = () => {
+    document.getElementById("unirseSalaView").classList.add("hidden")
+    document.getElementById("opcionesView").classList.remove("hidden")
+  }
+
+})
+
