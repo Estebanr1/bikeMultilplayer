@@ -1,11 +1,15 @@
 console.log("[ONLINE] Cargando modulo online V16 FIX")
 
-// ===== Firebase config (YA EXISTENTE EN TU PROYECTO) =====
-// firebase.initializeApp(firebaseConfig)
+// ===== FIREBASE INIT (OBLIGATORIO) =====
+if (!firebase.apps.length) {
+  firebase.initializeApp({
+    databaseURL: "https://bicigame-a06d7-default-rtdb.firebaseio.com",
+  })
+}
 
 const db = firebase.database()
 
-// ===== Estado =====
+// ===== ESTADO =====
 let roomId = null
 let playerId = "p" + Math.floor(Math.random() * 100000)
 let isHost = false
@@ -13,40 +17,31 @@ let gameStarted = false
 
 console.log("[ONLINE] Player ID:", playerId)
 
-// ===== Utils =====
-function isGameHost() {
-  return isHost === true
-}
-
-// ===== Crear sala =====
+// ===== CREAR SALA =====
 function createRoom() {
   roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
   isHost = true
+  gameStarted = false
 
   db.ref(`rooms/${roomId}`).set({
     state: "waiting",
     host: playerId,
     players: {
-      [playerId]: {
-        clicks: 0,
-        distance: 0,
-        speed: 0,
-      },
+      [playerId]: { speed: 0, distance: 0 },
     },
   })
 
   document.getElementById("codigoSala").textContent = roomId
   document.getElementById("salaConectada").textContent = roomId
 
-  showCrearSala()
-  listenRoomState()
-  listenPlayers()
+  listenRoom()
 }
 
-// ===== Unirse a sala =====
+// ===== UNIRSE =====
 function joinRoom(code) {
   roomId = code.toUpperCase()
   isHost = false
+  gameStarted = false
 
   db.ref(`rooms/${roomId}`).once("value").then((snap) => {
     if (!snap.exists()) {
@@ -55,41 +50,37 @@ function joinRoom(code) {
     }
 
     db.ref(`rooms/${roomId}/players/${playerId}`).set({
-      clicks: 0,
-      distance: 0,
       speed: 0,
+      distance: 0,
     })
 
     document.getElementById("salaConectada").textContent = roomId
-
-    showConectado()
-    listenRoomState()
-    listenPlayers()
+    listenRoom()
   })
 }
 
-// ===== UI =====
-function showCrearSala() {
-  document.getElementById("opcionesView").classList.add("hidden")
-  document.getElementById("crearSalaView").classList.remove("hidden")
+// ===== ESCUCHAR SALA =====
+function listenRoom() {
+  db.ref(`rooms/${roomId}`).on("value", (snap) => {
+    if (!snap.exists()) return
+
+    const data = snap.val()
+
+    if (data.state === "playing" && !gameStarted) {
+      gameStarted = true
+      window.startGame("online")
+    }
+
+    const players = data.players || {}
+    for (const id in players) {
+      if (id !== playerId && window.updateEnemyDisplay) {
+        window.updateEnemyDisplay(players[id])
+      }
+    }
+  })
 }
 
-function showConectado() {
-  document.getElementById("opcionesView").classList.add("hidden")
-  document.getElementById("crearSalaView").classList.add("hidden")
-  document.getElementById("unirseSalaView").classList.add("hidden")
-  document.getElementById("conectadoView").classList.remove("hidden")
-
-  const btn = document.getElementById("btnIniciarOnline")
-  if (isHost) {
-    btn.style.display = "block"
-    btn.disabled = false
-  } else {
-    btn.style.display = "none"
-  }
-}
-
-// ===== Iniciar carrera (SOLO HOST) =====
+// ===== INICIAR (SOLO HOST) =====
 function startOnlineGame() {
   if (!isHost) return
 
@@ -99,39 +90,10 @@ function startOnlineGame() {
   })
 }
 
-// ===== Escuchar estado de sala =====
-function listenRoomState() {
-  db.ref(`rooms/${roomId}/state`).on("value", (snap) => {
-    if (snap.val() === "playing" && !gameStarted) {
-      gameStarted = true
-      if (window.startGame) {
-        window.startGame("online")
-      }
-    }
-  })
-}
-
-// ===== Escuchar jugadores =====
-function listenPlayers() {
-  db.ref(`rooms/${roomId}/players`).on("value", (snap) => {
-    if (!snap.exists()) return
-
-    const players = snap.val()
-
-    for (const id in players) {
-      if (id !== playerId) {
-        if (window.updateEnemyDisplay) {
-          window.updateEnemyDisplay(players[id])
-        }
-      }
-    }
-  })
-}
-
-// ===== Exponer =====
+// ===== API =====
 window.createRoom = createRoom
 window.joinRoom = joinRoom
 window.startOnlineGame = startOnlineGame
-window.isGameHost = isGameHost
+window.isGameHost = () => isHost
 
 console.log("[ONLINE] Modulo online V16 FIX listo")
